@@ -12,6 +12,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from backend.api.chat import router as chat_router
+from backend.api.context import router as context_router
 from backend.api.health import router as health_router
 from backend.api.models import router as models_router
 from backend.api.setup import router as setup_router
@@ -174,6 +175,7 @@ def create_app() -> FastAPI:
     app.include_router(chat_router)
     app.include_router(models_router)
     app.include_router(setup_router)
+    app.include_router(context_router)
 
     # SPA static files (must be last — catches all non-API routes)
     # Mounted after frontend is built; in dev mode Vite handles this

@@ -14,9 +14,10 @@ interface ModelsData {
 
 interface SettingsProps {
   onBack: () => void;
+  onProfile?: () => void;
 }
 
-export function Settings({ onBack }: SettingsProps) {
+export function Settings({ onBack, onProfile }: SettingsProps) {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [models, setModels] = useState<ModelsData | null>(null);
 
@@ -58,6 +59,19 @@ export function Settings({ onBack }: SettingsProps) {
               <span className="info-val dim">{m.size_mb} MB</span>
             </div>
           ))}
+        </section>
+
+        {/* Profile */}
+        <section className="settings-section">
+          <div className="section-label">YOUR PROFILE</div>
+          <p className="info-desc">
+            Tell Almanac about your location, household, and setup for personalized answers.
+          </p>
+          {onProfile && (
+            <button className="profile-link" onClick={onProfile}>
+              Edit Profile
+            </button>
+          )}
         </section>
 
         {/* Content */}
@@ -193,6 +207,30 @@ export function Settings({ onBack }: SettingsProps) {
         }
         .info-link:hover {
           text-decoration: underline;
+        }
+        .info-desc {
+          font-size: 12.5px;
+          color: var(--text-muted);
+          line-height: 1.5;
+          margin-bottom: 10px;
+        }
+        .profile-link {
+          display: inline-block;
+          padding: 7px 16px;
+          background: var(--accent-dim);
+          color: var(--accent);
+          border: 1px solid var(--accent);
+          border-radius: 6px;
+          font-family: var(--font-mono);
+          font-size: 12px;
+          font-weight: 500;
+          letter-spacing: 0.04em;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .profile-link:hover {
+          background: var(--accent);
+          color: var(--bg);
         }
       `}</style>
     </div>

@@ -3,8 +3,9 @@ import { ChatInput } from "./components/ChatInput";
 import { ChatResponse, type Message } from "./components/ChatResponse";
 import { Setup } from "./pages/Setup";
 import { Settings } from "./pages/Settings";
+import { Profile } from "./pages/Profile";
 
-type Page = "loading" | "setup" | "chat" | "settings";
+type Page = "loading" | "setup" | "chat" | "settings" | "profile";
 
 const SUGGESTED = [
   "How do I safely can tomatoes at home?",
@@ -143,7 +144,8 @@ export default function App() {
   }
 
   if (page === "setup") return <Setup onReady={() => setPage("chat")} />;
-  if (page === "settings") return <Settings onBack={() => setPage("chat")} />;
+  if (page === "settings") return <Settings onBack={() => setPage("chat")} onProfile={() => setPage("profile")} />;
+  if (page === "profile") return <Profile onBack={() => setPage("settings")} />;
 
   return (
     <div className="app-layout">
