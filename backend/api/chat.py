@@ -88,13 +88,20 @@ async def _stream_response(
             tokens_generated += 1
             yield _sse_event("token", text=token)
 
-        # Step 4: Send metadata with done event
-        sources = retriever.get_sources(chunks) if chunks else []
+        # Step 4: Send metadata with done event — include chunk excerpts
         yield _sse_event(
             "done",
             confidence=round(confidence, 2),
             grounded=grounded,
-            sources=[{"source": s.source, "section": s.section} for s in sources],
+            sources=[
+                {
+                    "source": c.source,
+                    "section": c.section,
+                    "excerpt": c.text[:300],
+                    "score": round(c.dense_score, 3),
+                }
+                for c in chunks[:6]  # Top 6 chunks with excerpts
+            ],
             tokens_generated=tokens_generated,
         )
 

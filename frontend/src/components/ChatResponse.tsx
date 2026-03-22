@@ -4,6 +4,8 @@ import ReactMarkdown from "react-markdown";
 interface Source {
   source: string;
   section: string;
+  excerpt?: string;
+  score?: number;
 }
 
 export interface Message {
@@ -19,253 +21,128 @@ interface ChatResponseProps {
   isLatest?: boolean;
 }
 
-/* ─── Sources & Confidence Dropdown ─── */
+/* ─── Sources Accordion ─── */
 
-function SourcesDropdown({ sources, confidence, grounded }: {
+function SourcesAccordion({ sources, confidence, grounded }: {
   sources: Source[];
   confidence: number;
   grounded?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
-  const unique = sources.filter(
-    (s, i, arr) =>
-      arr.findIndex((x) => x.source === s.source && x.section === s.section) === i
-  );
-
   const pct = Math.round(confidence * 100);
   let statusColor = "var(--danger)";
   let statusLabel = "Low";
+  let statusExplain = "Few relevant sources found. Verify this information independently.";
   if (grounded === false) {
     statusColor = "var(--danger)";
     statusLabel = "Unverified";
+    statusExplain = "No sufficiently relevant sources found in the knowledge base. This response may not be reliable.";
   } else if (confidence >= 0.65) {
     statusColor = "var(--sage-bright)";
     statusLabel = "Grounded";
+    statusExplain = "Strong match found across multiple sources. Response is well-supported by the knowledge base.";
   } else if (confidence >= 0.4) {
     statusColor = "var(--accent)";
     statusLabel = "Partial";
+    statusExplain = "Some relevant sources found, but coverage is incomplete. Consider verifying key details.";
   }
 
   return (
-    <div className="sources-dropdown">
-      {/* Collapsed header */}
-      <button
-        className="sources-header"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-      >
-        <div className="sources-header-left">
-          {/* Source icon with count badge */}
-          <div className="sources-icon-group">
-            <div className="sources-icon-pill">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path d="M2 4c0-1 2.7-2 6-2s6 1 6 2M2 4v8c0 1 2.7 2 6 2s6-1 6-2V4M2 4c0 1 2.7 2 6 2s6-1 6-2M2 8c0 1 2.7 2 6 2s6-1 6-2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-              <span className="sources-badge">{unique.length}</span>
-            </div>
-            <div className="sources-icon-pill">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path d="M8 1v14M1 8h14M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.7"/>
-                <circle cx="8" cy="8" r="4" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-              </svg>
-              <span className="sources-badge" style={{ background: statusColor }}>{pct}</span>
-            </div>
-          </div>
-
-          <span className="sources-summary">
-            {unique.length} source{unique.length !== 1 ? "s" : ""}
-            <span className="sources-sep">·</span>
-            <span style={{ color: statusColor }}>{statusLabel}</span>
-            <span className="sources-pct">{pct}%</span>
+    <div className="sources-accordion">
+      {/* Toggle bar — pills + chevron */}
+      <button className={`sources-toggle ${open ? "sources-toggle-open" : ""}`} onClick={() => setOpen(!open)}>
+        <div className="sources-pills">
+          <span className="pill pill-sources">
+            {sources.length} source{sources.length !== 1 ? "s" : ""}
+          </span>
+          <span className="pill pill-confidence" style={{ color: statusColor, borderColor: statusColor }}>
+            {statusLabel} {pct}%
           </span>
         </div>
-
         <svg
           className={`sources-chevron ${open ? "open" : ""}`}
-          width="16" height="16" viewBox="0 0 16 16" fill="none"
+          width="14" height="14" viewBox="0 0 16 16" fill="none"
         >
           <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
 
-      {/* Expanded list */}
+      {/* Expanded content */}
       {open && (
-        <div className="sources-list">
-          {unique.map((s, i) => (
-            <div key={i} className="source-row">
-              <svg className="source-row-chevron" width="12" height="12" viewBox="0 0 16 16" fill="none">
-                <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <svg className="source-row-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.2"/>
-                <path d="M5 6h6M5 8.5h4" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-              </svg>
-              <div className="source-row-info">
-                <span className="source-row-name">{s.source}</span>
-                {s.section && (
-                  <>
-                    <span className="source-row-sep">·</span>
-                    <span className="source-row-section">{s.section}</span>
-                  </>
-                )}
-              </div>
-              <div
-                className="source-row-dot"
-                style={{ background: statusColor }}
-              />
-            </div>
+        <div className="sources-expand">
+          {/* Confidence explanation */}
+          <div className="confidence-explain" style={{ color: statusColor }}>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M8 5v3.5M8 10.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+            <span>{statusExplain}</span>
+          </div>
+
+          {/* Source rows */}
+          {sources.map((s, i) => (
+            <SourceRow key={i} source={s} />
           ))}
         </div>
       )}
+    </div>
+  );
+}
 
-      <style>{`
-        .sources-dropdown {
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          background: var(--bg-elevated);
-          overflow: hidden;
-          animation: slideIn 0.3s ease 0.1s both;
-        }
-        .sources-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          width: 100%;
-          padding: 8px 14px;
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: var(--text-muted);
-          font-family: var(--font-body);
-          transition: background 0.15s;
-        }
-        .sources-header:hover {
-          background: rgba(255,255,255,0.02);
-        }
-        .sources-header-left {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .sources-icon-group {
-          display: flex;
-          align-items: center;
-          gap: 0;
-          background: var(--bg-card);
-          border: 1px solid var(--border);
-          border-radius: 20px;
-          padding: 3px 6px;
-        }
-        .sources-icon-pill {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 24px;
-          height: 24px;
-          color: var(--text-muted);
-        }
-        .sources-badge {
-          position: absolute;
-          top: -2px;
-          right: -4px;
-          font-family: var(--font-mono);
-          font-size: 8px;
-          font-weight: 600;
-          min-width: 14px;
-          height: 14px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 7px;
-          background: var(--accent);
-          color: var(--bg);
-          padding: 0 3px;
-          line-height: 1;
-        }
-        .sources-summary {
-          font-size: 13px;
-          color: var(--text-muted);
-          display: flex;
-          align-items: center;
-          gap: 4px;
-        }
-        .sources-sep {
-          color: var(--text-dim);
-          margin: 0 2px;
-        }
-        .sources-pct {
-          font-family: var(--font-mono);
-          font-size: 12px;
-          color: var(--text-dim);
-          margin-left: 2px;
-        }
-        .sources-chevron {
-          color: var(--text-dim);
-          transition: transform 0.2s ease;
-          flex-shrink: 0;
-        }
-        .sources-chevron.open {
-          transform: rotate(180deg);
-        }
+function SourceIcon({ source }: { source: string }) {
+  // Different icon colors by source type — extensible for future categories
+  let color = "var(--accent)";
+  if (source.includes("USDA")) color = "var(--sage-bright)";
+  else if (source.includes("FEMA") || source.includes("CDC")) color = "#6b9ede";
+  else if (source.includes("Extension")) color = "var(--accent)";
+  else if (source.includes("Peace Corps")) color = "#c27adb";
+  else if (source.includes("Army") || source.includes("FM ")) color = "#8a9a6b";
 
-        /* Expanded list */
-        .sources-list {
-          border-top: 1px solid var(--border);
-          padding: 4px 0;
-          animation: fadeInUp 0.2s ease;
-        }
-        .source-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 8px 14px;
-          transition: background 0.1s;
-        }
-        .source-row:hover {
-          background: rgba(255,255,255,0.015);
-        }
-        .source-row-chevron {
-          color: var(--text-dim);
-          flex-shrink: 0;
-        }
-        .source-row-icon {
-          color: var(--accent);
-          flex-shrink: 0;
-          opacity: 0.7;
-        }
-        .source-row-info {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          flex: 1;
-          min-width: 0;
-          overflow: hidden;
-        }
-        .source-row-name {
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--text);
-          white-space: nowrap;
-        }
-        .source-row-sep {
-          color: var(--text-dim);
-        }
-        .source-row-section {
-          font-size: 13px;
-          color: var(--text-muted);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .source-row-dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          flex-shrink: 0;
-        }
-      `}</style>
+  return (
+    <svg className="source-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ color }}>
+      <path d="M4 1.5h6l3 3V13a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 013 13V3A1.5 1.5 0 014 1.5z" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M10 1.5V5h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+      <path d="M5.5 8h5M5.5 10.5h3.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
+    </svg>
+  );
+}
+
+function SourceRow({ source }: { source: Source }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasExcerpt = !!source.excerpt;
+
+  return (
+    <div className="source-item">
+      <button
+        className="source-row"
+        onClick={() => hasExcerpt && setExpanded(!expanded)}
+        style={{ cursor: hasExcerpt ? "pointer" : "default" }}
+      >
+        <svg
+          className={`source-row-chevron ${expanded ? "expanded" : ""}`}
+          width="10" height="10" viewBox="0 0 16 16" fill="none"
+          style={{ opacity: hasExcerpt ? 1 : 0 }}
+        >
+          <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        <SourceIcon source={source.source} />
+        <span className="source-name">{source.source}</span>
+        {source.section && (
+          <>
+            <span className="source-sep">·</span>
+            <span className="source-section">{source.section}</span>
+          </>
+        )}
+      </button>
+
+      {expanded && source.excerpt && (
+        <div className="source-excerpt-wrap">
+          <div className="source-excerpt-card">
+            <p>{source.excerpt}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -304,7 +181,7 @@ export function ChatResponse({ message, isLatest }: ChatResponseProps) {
         </div>
 
         {!isUser && message.confidence !== undefined && message.sources && message.sources.length > 0 && (
-          <SourcesDropdown
+          <SourcesAccordion
             sources={message.sources}
             confidence={message.confidence}
             grounded={message.grounded}
@@ -345,6 +222,7 @@ export function ChatResponse({ message, isLatest }: ChatResponseProps) {
           gap: 10px;
           min-width: 0;
           max-width: 100%;
+          flex: 1;
         }
         .msg-role {
           font-family: var(--font-mono);
@@ -380,6 +258,149 @@ export function ChatResponse({ message, isLatest }: ChatResponseProps) {
           border-radius: 50%;
           background: var(--text-muted);
           animation: pulse 1s ease infinite;
+        }
+
+        /* ─── Sources Accordion ─── */
+        .sources-accordion {
+          animation: slideIn 0.3s ease 0.1s both;
+        }
+        .sources-toggle {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 100%;
+          padding: 6px 10px;
+          margin: 0 -10px;
+          width: calc(100% + 20px);
+          background: none;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-family: var(--font-body);
+          transition: background 0.15s;
+        }
+        .sources-toggle:hover {
+          background: rgba(255,255,255,0.03);
+        }
+        .sources-toggle:hover .sources-chevron {
+          color: var(--text-muted);
+        }
+        .sources-toggle-open {
+          background: rgba(255,255,255,0.02);
+        }
+        .sources-pills {
+          display: flex;
+          gap: 6px;
+        }
+        .pill {
+          font-family: var(--font-mono);
+          font-size: 11px;
+          font-weight: 500;
+          padding: 3px 10px;
+          border-radius: 20px;
+          letter-spacing: 0.02em;
+          line-height: 1.4;
+        }
+        .pill-sources {
+          color: var(--text-muted);
+          border: 1px solid var(--border-light);
+        }
+        .pill-confidence {
+          border: 1px solid;
+          background: none;
+        }
+        .sources-chevron {
+          color: var(--text-dim);
+          transition: transform 0.2s ease, color 0.15s;
+          flex-shrink: 0;
+        }
+        .sources-chevron.open {
+          transform: rotate(180deg);
+        }
+
+        /* Expanded content */
+        .sources-expand {
+          padding: 6px 0 2px;
+          animation: fadeInUp 0.2s ease;
+        }
+        .confidence-explain {
+          display: flex;
+          align-items: flex-start;
+          gap: 7px;
+          font-size: 11.5px;
+          line-height: 1.5;
+          padding: 6px 2px 10px;
+          opacity: 0.85;
+        }
+
+        .source-item + .source-item {
+          border-top: 1px solid var(--border);
+        }
+
+        .source-row {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          width: 100%;
+          padding: 7px 2px;
+          background: none;
+          border: none;
+          color: inherit;
+          font-family: var(--font-body);
+          text-align: left;
+          border-radius: 4px;
+          transition: background 0.1s;
+        }
+        .source-row:hover {
+          background: rgba(255,255,255,0.025);
+        }
+        .source-row-chevron {
+          color: var(--text-dim);
+          flex-shrink: 0;
+          transition: transform 0.15s ease;
+        }
+        .source-row-chevron.expanded {
+          transform: rotate(90deg);
+        }
+        .source-icon {
+          flex-shrink: 0;
+        }
+        .source-name {
+          font-size: 12.5px;
+          font-weight: 600;
+          color: var(--text-muted);
+          white-space: nowrap;
+        }
+        .source-sep {
+          color: var(--text-dim);
+          flex-shrink: 0;
+          font-size: 12px;
+        }
+        .source-section {
+          font-size: 12.5px;
+          color: var(--text-dim);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        /* Expanded excerpt */
+        .source-excerpt-wrap {
+          padding: 4px 0 8px 19px;
+          animation: fadeInUp 0.15s ease;
+        }
+        .source-excerpt-card {
+          background: var(--bg-elevated);
+          border: 1px solid var(--border);
+          border-left: 2px solid var(--accent);
+          border-radius: 0 6px 6px 0;
+          padding: 10px 14px;
+        }
+        .source-excerpt-card p {
+          font-size: 12px;
+          line-height: 1.65;
+          color: var(--text-muted);
+          margin: 0;
         }
       `}</style>
     </div>
