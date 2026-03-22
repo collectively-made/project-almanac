@@ -1,0 +1,25 @@
+# Wound Care and First Aid
+
+## Controlling Bleeding
+
+For serious bleeding, apply direct pressure with the cleanest cloth available and maintain continuous pressure for at least 10 minutes — do not peek to check progress, as this disrupts clot formation. Elevate the wounded area above the heart if possible. If blood soaks through, add more cloth on top without removing the first layer. For life-threatening extremity bleeding that does not stop with direct pressure, apply a tourniquet 2-3 inches above the wound (never on a joint). Note the time of application — a tourniquet should be loosened by medical professionals, not by a first responder. Pack deep wounds with clean cloth and maintain pressure.
+
+## Wound Cleaning
+
+Once bleeding is controlled, clean the wound thoroughly to prevent infection. Irrigate with clean water using pressure — a squeeze bottle, syringe, or a plastic bag with a small hole works well. Flush the wound from the center outward to push debris out, not in. If clean water is unavailable, use diluted povidone-iodine (Betadine) or a mild soap solution. Remove visible debris with clean tweezers. Do not use hydrogen peroxide, rubbing alcohol, or iodine at full strength on open wounds — they damage tissue and delay healing.
+
+## Wound Closure
+
+Small, clean cuts can be closed with butterfly bandages or medical tape strips. Clean the skin around the wound with alcohol (not the wound itself), apply strips perpendicular to the cut to pull the edges together, leaving slight gaps between strips for drainage. Do not close wounds that are dirty, more than 6-8 hours old, caused by animal bites, or showing signs of infection — these need to drain and heal from the inside out. Deep wounds, wounds with embedded objects, and wounds that expose bone, tendon, or fat require professional medical care.
+
+## Infection Signs and Treatment
+
+Watch for signs of wound infection starting 24-48 hours after injury: increasing redness spreading outward from the wound, swelling, warmth around the site, increasing pain, pus or cloudy drainage, fever, and red streaks extending from the wound toward the heart (a sign of serious spreading infection requiring immediate medical attention). For minor wound infections, soak the area in warm salt water (1 tablespoon salt per quart of water) three times daily for 15 minutes. Apply antibiotic ointment and a clean bandage. Change dressings twice daily. If infection worsens despite treatment, seek medical care — systemic antibiotics may be needed.
+
+## Burn Treatment
+
+For minor burns (small area, red without blisters): cool immediately under running water for 10-20 minutes. Do not use ice, butter, or toothpaste. Cover with a sterile non-stick bandage. Over-the-counter pain relief as needed. For burns with blisters: cool with running water, do not pop blisters (they protect against infection), cover loosely with a non-stick sterile dressing. For severe burns (white or charred appearance, large area, or involving face, hands, feet, joints, or genitals): call emergency services, cover loosely with a clean dry cloth, treat for shock (lay flat, elevate legs, keep warm), and do not remove clothing stuck to the burn.
+
+## Splinting Fractures
+
+If you suspect a broken bone, immobilize the injury before moving the person. A basic splint uses rigid material (sticks, boards, rolled newspaper, a SAM splint) padded with cloth and secured with bandages, strips of cloth, or tape. The splint should extend beyond the joints above and below the fracture. Check circulation below the splint: skin color, warmth, and pulse. If fingers or toes become numb, blue, or cold, loosen the splint. Do not attempt to straighten a deformed limb unless there is no pulse below the injury (indicating the blood supply is compromised). For suspected spinal injuries, do not move the person — stabilize the head and neck and wait for emergency services.
