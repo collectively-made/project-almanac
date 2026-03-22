@@ -1,0 +1,28 @@
+# Production deployment — single container, hardened
+services:
+  almanac:
+    image: ghcr.io/project-almanac/almanac:latest
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - almanac-config:/app/config
+      - almanac-models:/app/models
+      - almanac-content:/app/content
+    environment:
+      - PUID=1000
+      - PGID=1000
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 15s
+
+volumes:
+  almanac-config:
+  almanac-models:
+  almanac-content:

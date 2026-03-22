@@ -1,0 +1,33 @@
+# Development environment — hot-reload for both frontend and backend
+services:
+  backend:
+    build:
+      context: .
+      target: runtime
+    command: python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+      - almanac-config:/app/config
+      - almanac-models:/app/models
+      - almanac-content:/app/content
+    environment:
+      - ALMANAC_CONFIG_DIR=/app/config
+      - ALMANAC_MODELS_DIR=/app/models
+      - ALMANAC_CONTENT_DIR=/app/content
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: npm run dev -- --host 0.0.0.0
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  almanac-config:
+  almanac-models:
+  almanac-content:
