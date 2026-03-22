@@ -32,5 +32,8 @@ class AlmanacSettings(BaseSettings):
     # Safety
     max_message_length: int = 2048
 
+    # Auto-setup: download and load a model on first boot
+    auto_setup: bool = True
+
 
 settings = AlmanacSettings()

@@ -20,11 +20,28 @@ export default function App() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/setup/status")
-      .then((r) => r.json())
-      .then((data) => setPage(data.status === "ready" ? "chat" : "setup"))
-      .catch(() => setPage("setup"));
-  }, []);
+    let interval: ReturnType<typeof setInterval>;
+
+    const checkStatus = () => {
+      fetch("/api/setup/status")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.status === "ready") {
+            setPage("chat");
+            if (interval) clearInterval(interval);
+          } else {
+            setPage("setup");
+          }
+        })
+        .catch(() => setPage("setup"));
+    };
+
+    checkStatus();
+    // Poll every 3s while on setup — catches auto-download completing on backend
+    interval = setInterval(checkStatus, 3000);
+
+    return () => clearInterval(interval);
+  }, [page]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -140,9 +157,9 @@ export default function App() {
           </div>
         </div>
         <button onClick={() => setPage("settings")} className="header-settings">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M6.86 1.58a1.18 1.18 0 012.28 0l.2.76a1.18 1.18 0 001.5.74l.72-.28a1.18 1.18 0 011.62 1.14l-.08.78a1.18 1.18 0 001.1 1.22l.78.06a1.18 1.18 0 01.56 2.2l-.64.44a1.18 1.18 0 00-.36 1.58l.4.66a1.18 1.18 0 01-.98 1.82l-.78-.02a1.18 1.18 0 00-1.16 1.04l-.14.76a1.18 1.18 0 01-2.16.68l-.48-.62a1.18 1.18 0 00-1.58-.24l-.62.46a1.18 1.18 0 01-1.88-.86l.04-.78a1.18 1.18 0 00-.98-1.24l-.76-.16a1.18 1.18 0 01-.44-2.22l.66-.42a1.18 1.18 0 00.44-1.56l-.36-.68a1.18 1.18 0 011.08-1.76l.78.06a1.18 1.18 0 001.22-1z" stroke="currentColor" strokeWidth="1.1"/>
-            <circle cx="8" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.1"/>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/>
+            <circle cx="12" cy="12" r="3"/>
           </svg>
         </button>
       </header>

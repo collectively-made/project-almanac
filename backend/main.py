@@ -17,7 +17,7 @@ from backend.api.models import router as models_router
 from backend.api.setup import router as setup_router
 from backend.config import settings
 from backend.content.loader import load_content_packs
-from backend.dependencies import get_database, get_fulltext, get_retriever, get_vectorstore
+from backend.dependencies import get_database, get_fulltext, get_llm_manager, get_retriever, get_vectorstore
 
 
 # --- Structured JSON Logging ---
@@ -97,6 +97,43 @@ async def lifespan(app: FastAPI):
         logger.info("Content indexed: %d total chunks", total)
     except Exception:
         logger.exception("Content indexing failed")
+
+    # Auto-load model if one exists in the models directory
+    llm = get_llm_manager()
+    models = llm.list_models()
+    if models and not llm.is_loaded:
+        try:
+            await llm.load_model(models[0]["name"])
+            logger.info("Auto-loaded model: %s", models[0]["name"])
+        except Exception:
+            logger.exception("Auto-load failed for %s", models[0]["name"])
+    elif not models and settings.auto_setup:
+        # Auto-download a recommended model on first boot
+        logger.info("No models found. Auto-setup enabled — downloading recommended model...")
+        try:
+            from backend.api.setup import RECOMMENDED_MODELS
+            import urllib.request
+
+            if RECOMMENDED_MODELS:
+                model = RECOMMENDED_MODELS[0]
+                dest = settings.models_dir / model["name"]
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                if not dest.exists():
+                    req = urllib.request.Request(model["url"])
+                    req.add_header("User-Agent", "ProjectAlmanac/0.1")
+                    logger.info("Downloading %s (%s GB)...", model["name"], model["size_gb"])
+                    with urllib.request.urlopen(req, timeout=600) as response:
+                        with open(str(dest), "wb") as f:
+                            while True:
+                                chunk = response.read(1024 * 1024)
+                                if not chunk:
+                                    break
+                                f.write(chunk)
+                    logger.info("Download complete: %s", model["name"])
+                    await llm.load_model(model["name"])
+                    logger.info("Auto-loaded model: %s", model["name"])
+        except Exception:
+            logger.exception("Auto-download failed (set ALMANAC_AUTO_SETUP=false to disable)")
 
     logger.info(
         "Almanac started",

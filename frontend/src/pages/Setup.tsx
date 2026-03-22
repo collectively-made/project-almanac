@@ -44,7 +44,12 @@ export function Setup({ onReady }: SetupProps) {
     }
   };
 
-  useEffect(() => { fetchStatus(); }, []);
+  useEffect(() => {
+    fetchStatus();
+    // Poll while on loading/welcome — auto-download may complete on backend
+    const interval = setInterval(fetchStatus, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleQuickStart = async () => {
     if (!status || status.recommended_models.length === 0) return;
@@ -135,11 +140,15 @@ export function Setup({ onReady }: SetupProps) {
           </div>
         </div>
 
-        {/* Step: Loading */}
+        {/* Step: Loading / auto-setup in progress */}
         {step === "loading" && (
           <div className="setup-center">
             <div className="setup-spinner" />
-            <p className="setup-status-text">Connecting...</p>
+            <p className="setup-status-text">Setting up Almanac...</p>
+            <p className="setup-status-sub">
+              If this is the first run, the AI model is being downloaded automatically.
+              This may take a few minutes.
+            </p>
           </div>
         )}
 
