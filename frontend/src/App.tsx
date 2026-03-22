@@ -4,8 +4,9 @@ import { ChatResponse, type Message } from "./components/ChatResponse";
 import { Setup } from "./pages/Setup";
 import { Settings } from "./pages/Settings";
 import { Profile } from "./pages/Profile";
+import { ContextBuilder } from "./pages/ContextBuilder";
 
-type Page = "loading" | "setup" | "chat" | "settings" | "profile";
+type Page = "loading" | "setup" | "chat" | "settings" | "profile" | "context-builder";
 
 const SUGGESTED = [
   "How do I safely can tomatoes at home?",
@@ -18,7 +19,16 @@ export default function App() {
   const [page, setPage] = useState<Page>("loading");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [hasProfile, setHasProfile] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Check if user has a profile
+  useEffect(() => {
+    fetch("/api/context/profile")
+      .then((r) => r.json())
+      .then((data) => setHasProfile(Object.keys(data).length > 0))
+      .catch(() => {});
+  }, [page]);
 
   useEffect(() => {
     // Only poll during loading/setup — once on chat/settings/profile, stop
@@ -146,6 +156,7 @@ export default function App() {
   if (page === "setup") return <Setup onReady={() => setPage("chat")} />;
   if (page === "settings") return <Settings onBack={() => setPage("chat")} onProfile={() => setPage("profile")} />;
   if (page === "profile") return <Profile onBack={() => setPage("settings")} />;
+  if (page === "context-builder") return <ContextBuilder onDone={() => setPage("chat")} />;
 
   return (
     <div className="app-layout">
@@ -158,12 +169,25 @@ export default function App() {
             <span className="header-sub">Homesteading Knowledge Base</span>
           </div>
         </div>
-        <button onClick={() => setPage("settings")} className="header-settings">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        </button>
+        <div className="header-actions">
+          <button
+            onClick={() => setPage("context-builder")}
+            className={`header-btn ${hasProfile ? "has-profile" : ""}`}
+            title={hasProfile ? "Edit your profile" : "Add your context"}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            {hasProfile && <span className="profile-dot" />}
+          </button>
+          <button onClick={() => setPage("settings")} className="header-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
       </header>
 
       {/* Messages */}
@@ -192,6 +216,25 @@ export default function App() {
                 </button>
               ))}
             </div>
+
+            {!hasProfile && (
+              <>
+                <div className="context-divider" />
+                <button
+                  className="context-cta"
+                  onClick={() => setPage("context-builder")}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  Add your context for personalized answers
+                </button>
+                <p className="context-privacy">
+                  Stored locally on your device. Never leaves your network.
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <div className="messages-list">
@@ -254,7 +297,12 @@ export default function App() {
           color: var(--text-dim);
           letter-spacing: 0.02em;
         }
-        .header-settings {
+        .header-actions {
+          display: flex;
+          gap: 4px;
+        }
+        .header-btn {
+          position: relative;
           width: 32px;
           height: 32px;
           display: flex;
@@ -267,10 +315,19 @@ export default function App() {
           cursor: pointer;
           transition: all 0.15s;
         }
-        .header-settings:hover {
+        .header-btn:hover {
           color: var(--text);
           border-color: var(--border);
           background: var(--bg-elevated);
+        }
+        .profile-dot {
+          position: absolute;
+          top: 4px;
+          right: 4px;
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--sage-bright);
         }
 
         /* Main */
@@ -333,6 +390,40 @@ export default function App() {
           border-color: var(--accent);
           color: var(--text);
           background: var(--accent-dim);
+        }
+
+        /* Context CTA */
+        .context-divider {
+          width: 60px;
+          height: 1px;
+          background: var(--border);
+          margin: 20px auto 16px;
+        }
+        .context-cta {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 18px;
+          background: none;
+          border: 1px dashed var(--border-light);
+          border-radius: 20px;
+          color: var(--text-muted);
+          font-family: var(--font-body);
+          font-size: 13px;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .context-cta:hover {
+          border-color: var(--accent);
+          color: var(--text);
+          border-style: solid;
+        }
+        .context-privacy {
+          font-family: var(--font-mono);
+          font-size: 10px;
+          color: var(--text-dim);
+          margin-top: 8px;
+          letter-spacing: 0.02em;
         }
 
         /* Messages */
