@@ -12,7 +12,8 @@ from backend.api.chat import router as chat_router
 from backend.api.health import router as health_router
 from backend.api.models import router as models_router
 from backend.config import settings
-from backend.dependencies import get_database
+from backend.content.loader import load_content_packs
+from backend.dependencies import get_database, get_fulltext, get_retriever, get_vectorstore
 
 logger = logging.getLogger("almanac")
 
@@ -48,6 +49,20 @@ async def lifespan(app: FastAPI):
         logger.info("Database integrity check passed")
     else:
         logger.error("Database integrity check FAILED")
+
+    # Index content packs
+    try:
+        total = await load_content_packs(
+            builtin_dir=settings.builtin_dir,
+            content_dir=settings.content_dir,
+            db=db,
+            vectorstore=get_vectorstore(),
+            fulltext=get_fulltext(),
+            retriever=get_retriever(),
+        )
+        logger.info("Content indexed: %d total chunks", total)
+    except Exception:
+        logger.exception("Content indexing failed")
 
     logger.info(
         "Almanac started",

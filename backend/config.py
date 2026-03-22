@@ -24,7 +24,7 @@ class AlmanacSettings(BaseSettings):
     llm_context_window: Optional[int] = None  # None = auto from RAM
 
     # RAG
-    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     retrieval_top_k: int = 10
     rrf_k: int = 60
     min_retrieval_score: float = 0.3  # Safety floor
