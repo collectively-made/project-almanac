@@ -18,8 +18,14 @@ logger = logging.getLogger("almanac.chat")
 router = APIRouter()
 
 
+class ChatHistoryMessage(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., max_length=4096)
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=2048)
+    history: list[ChatHistoryMessage] = Field(default_factory=list, max_length=10)
 
 
 from backend.api.sse import sse_event as _sse_event
@@ -47,7 +53,11 @@ SYSTEM_PROMPT = (
 
 
 def _build_messages(
-    message: str, chunks: list, grounded: bool, user_context: str = ""
+    message: str,
+    chunks: list,
+    grounded: bool,
+    user_context: str = "",
+    history: list[ChatHistoryMessage] | None = None,
 ) -> list[dict]:
     """Build chat messages for the LLM's chat completion API."""
     system_parts = [SYSTEM_PROMPT]
@@ -72,10 +82,15 @@ def _build_messages(
 
     system = "\n\n".join(system_parts)
 
-    return [
-        {"role": "system", "content": system},
-        {"role": "user", "content": message},
-    ]
+    messages: list[dict] = [{"role": "system", "content": system}]
+
+    # Add conversation history for multi-turn context
+    if history:
+        for h in history:
+            messages.append({"role": h.role, "content": h.content})
+
+    messages.append({"role": "user", "content": message})
+    return messages
 
 
 async def _load_user_context(db: Database) -> str:
@@ -98,6 +113,7 @@ async def _stream_response(
     retriever: Retriever,
     db: Database,
     message: str,
+    history: list[ChatHistoryMessage] | None = None,
 ):
     """Generate SSE events with RAG-grounded, context-aware responses."""
     tokens_generated = 0
@@ -113,8 +129,8 @@ async def _stream_response(
             min_score=settings.min_retrieval_score,
         )
 
-        # Step 3: Build chat messages with context
-        messages = _build_messages(message, chunks, grounded, user_context)
+        # Step 3: Build chat messages with context + conversation history
+        messages = _build_messages(message, chunks, grounded, user_context, history)
 
         # Step 3: Stream LLM response via chat completion
         async for token in llm.chat(
@@ -193,6 +209,6 @@ async def chat(
         )
 
     return EventSourceResponse(
-        _stream_response(request, llm, retriever, db, body.message),
+        _stream_response(request, llm, retriever, db, body.message, body.history or None),
         media_type="text/event-stream",
     )
