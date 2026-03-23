@@ -233,7 +233,7 @@ export function useChat(): UseChatReturn {
     setChatMode("profile");
     setMessages([]);
     setActiveThreadId(null);
-    sendMessage("Hi, I'd like to set up my profile.", true);
+    sendMessage("I'd like to tell you about my situation so you can give me better homesteading and survival advice. Ask me questions about where I live and my setup.", true);
   }, [sendMessage]);
 
   return {
