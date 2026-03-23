@@ -19,6 +19,8 @@ interface SetupStatus {
     fit_level: string;
     gguf_repo: string;
     gguf_url: string;
+    download_url: string;
+    download_filename: string;
     use_case: string;
   }[];
 }
@@ -27,12 +29,13 @@ interface SetupProps {
   onReady: () => void;
 }
 
-type Step = "loading" | "needs-model" | "has-model" | "loading-model";
+type Step = "loading" | "needs-model" | "has-model" | "loading-model" | "downloading";
 
 export function Setup({ onReady }: SetupProps) {
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [step, setStep] = useState<Step>("loading");
   const [error, setError] = useState("");
+  const [downloadProgress, setDownloadProgress] = useState("");
 
   const fetchStatus = async () => {
     try {
@@ -53,6 +56,59 @@ export function Setup({ onReady }: SetupProps) {
     const id = setInterval(fetchStatus, 4000);
     return () => clearInterval(id);
   }, []);
+
+  const handleInstall = async (model: SetupStatus["recommended_models"][0]) => {
+    if (!model.download_url || !model.download_filename) {
+      // No direct download — open HuggingFace page
+      window.open(model.gguf_url, "_blank");
+      return;
+    }
+    setStep("downloading");
+    setDownloadProgress("Connecting...");
+    setError("");
+    try {
+      const r = await fetch("/api/setup/download-model", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: model.download_url, filename: model.download_filename }),
+      });
+      if (!r.ok || !r.body) {
+        const data = await r.json().catch(() => ({ detail: `HTTP ${r.status}` }));
+        throw new Error(data.detail || `HTTP ${r.status}`);
+      }
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.event === "progress") {
+              setDownloadProgress(
+                data.stage === "complete"
+                  ? "Download complete!"
+                  : `Downloading ${model.download_filename}...`
+              );
+            } else if (data.event === "done") {
+              await handleLoad(model.download_filename);
+            } else if (data.event === "error") {
+              setError(data.message || "Download failed. Try the manual link.");
+              setStep("needs-model");
+            }
+          } catch {}
+        }
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Download failed. Try the manual link.");
+      setStep("needs-model");
+    }
+  };
 
   const handleLoad = async (name: string) => {
     setStep("loading-model");
@@ -92,6 +148,15 @@ export function Setup({ onReady }: SetupProps) {
           <div className="su-center">
             <div className="su-spinner" />
             <p className="su-text">Connecting...</p>
+          </div>
+        )}
+
+        {/* Downloading model */}
+        {step === "downloading" && (
+          <div className="su-center">
+            <div className="su-spinner" />
+            <p className="su-text">{downloadProgress}</p>
+            <p className="su-muted">One-time download. The model runs entirely on your device.</p>
           </div>
         )}
 
@@ -157,9 +222,16 @@ export function Setup({ onReady }: SetupProps) {
                         {m.provider} · {m.quantization} · {m.min_ram_gb} GB RAM · ~{Math.round(m.estimated_tps)} tok/s
                       </p>
                     </div>
-                    <a href={m.gguf_url} target="_blank" rel="noopener" className="su-btn-link">
-                      Get model ↗
-                    </a>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button className="su-btn" onClick={() => handleInstall(m)}>
+                        Install
+                      </button>
+                      {m.gguf_url && (
+                        <a href={m.gguf_url} target="_blank" rel="noopener" className="su-btn-link" title="View on HuggingFace">
+                          ↗
+                        </a>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

@@ -154,12 +154,19 @@ def recommend_models(
         # Get best GGUF download URL
         download_url = ""
         download_repo = ""
+        download_filename = ""
         for src in gguf_sources:
             repo = src.get("repo", "")
             if repo:
                 download_repo = repo
-                # Construct a likely GGUF download URL
-                download_url = f"https://huggingface.co/{repo}"
+                # Construct the likely GGUF filename from the repo name
+                # Pattern: repo usually named like "bartowski/Phi-3.5-mini-instruct-GGUF"
+                # Files inside are like "Phi-3.5-mini-instruct-Q4_K_M.gguf"
+                repo_name = repo.split("/")[-1]
+                base_name = repo_name.replace("-GGUF", "").replace("-gguf", "")
+                q = quant if quant and "Q" in quant.upper() else "Q4_K_M"
+                download_filename = f"{base_name}-{q}.gguf"
+                download_url = f"https://huggingface.co/{repo}/resolve/main/{download_filename}"
                 break
 
         scored.append({
@@ -175,7 +182,9 @@ def recommend_models(
             "estimated_tps": round(estimated_tps, 1),
             "fit_level": "Perfect" if utilization <= 0.6 else "Good" if utilization <= 0.8 else "Tight",
             "gguf_repo": download_repo,
-            "gguf_url": download_url,
+            "gguf_url": f"https://huggingface.co/{download_repo}" if download_repo else "",
+            "download_url": download_url,
+            "download_filename": download_filename,
             "use_case": m.get("use_case", ""),
         })
 
