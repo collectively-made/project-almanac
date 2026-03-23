@@ -68,12 +68,30 @@ def _build_messages(
 
     if chunks and grounded:
         context_parts = []
+        doc_refs = []
+        seen_files = set()
         for i, chunk in enumerate(chunks[:3], 1):
             context_parts.append(
                 f"[Source {i}: {chunk.source} — {chunk.section}]\n{chunk.text}"
             )
+            if chunk.source_file and chunk.source_file not in seen_files:
+                seen_files.add(chunk.source_file)
+                doc_refs.append(
+                    f"- {chunk.source}: /api/files/{chunk.pack_id}/{chunk.source_file}"
+                )
         context = "\n\n".join(context_parts)
         system_parts.append(f"## Source Material\n\n{context}")
+
+        if doc_refs:
+            system_parts.append(
+                "## Available Documents\n\n"
+                "These full documents are stored locally and available to the user. "
+                "If you are drawing heavily from one or the user would benefit from reading "
+                "the full document (e.g. for diagrams, detailed tables, or step-by-step procedures), "
+                "you may reference it inline like: **[Document Title ↗](url)**\n"
+                "Only reference a document when it adds real value — not for every response.\n\n"
+                + "\n".join(doc_refs)
+            )
     else:
         system_parts.append(
             "No relevant source material was found. "
@@ -144,20 +162,34 @@ async def _stream_response(
             tokens_generated += 1
             yield _sse_event("token", text=token)
 
-        # Step 4: Send metadata with done event — include chunk excerpts
+        # Step 4: Build sources and documents lists
+        sources_list = []
+        documents_list = []
+        seen_docs = set()
+
+        for c in chunks[:6]:
+            sources_list.append({
+                "source": c.source,
+                "section": c.section,
+                "excerpt": c.text[:300],
+                "score": round(c.dense_score, 3),
+            })
+            # Collect unique documents
+            if c.source_file and c.source_file not in seen_docs:
+                seen_docs.add(c.source_file)
+                documents_list.append({
+                    "title": c.source,
+                    "filename": c.source_file,
+                    "pack_id": c.pack_id,
+                    "url": f"/api/files/{c.pack_id}/{c.source_file}",
+                })
+
         yield _sse_event(
             "done",
             confidence=round(confidence, 2),
             grounded=grounded,
-            sources=[
-                {
-                    "source": c.source,
-                    "section": c.section,
-                    "excerpt": c.text[:300],
-                    "score": round(c.dense_score, 3),
-                }
-                for c in chunks[:6]  # Top 6 chunks with excerpts
-            ],
+            sources=sources_list,
+            documents=documents_list,
             tokens_generated=tokens_generated,
         )
 

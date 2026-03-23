@@ -77,13 +77,24 @@ def build_pack(pack_name: str, source_dir: Path) -> int:
     output_dir = OUTPUT_DIR / pack_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Load source file mappings if available
+    source_file_map = {}
+    map_path = source_dir / "source_files.json"
+    if map_path.exists():
+        source_file_map = json.loads(map_path.read_text())
+
     all_chunks = []
     for md_file in sorted(source_dir.glob("*.md")):
         source_name = md_file.stem.replace("-", " ").replace("_", " ").title()
         text = md_file.read_text()
         chunks = chunk_markdown(text, source=source_name)
+        # Add source_file if we have a mapping for this markdown file
+        source_file = source_file_map.get(md_file.name, "")
+        if source_file:
+            for chunk in chunks:
+                chunk["source_file"] = source_file
         all_chunks.extend(chunks)
-        print(f"  {md_file.name}: {len(chunks)} chunks")
+        print(f"  {md_file.name}: {len(chunks)} chunks" + (f" -> {source_file}" if source_file else ""))
 
     # Write as JSONL (one file per pack for simplicity)
     jsonl_path = output_dir / f"{pack_name}.jsonl"

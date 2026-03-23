@@ -8,10 +8,18 @@ interface Source {
   score?: number;
 }
 
+interface Document {
+  title: string;
+  filename: string;
+  pack_id: string;
+  url: string;
+}
+
 export interface Message {
   role: "user" | "assistant";
   content: string;
   sources?: Source[];
+  documents?: Document[];
   confidence?: number;
   grounded?: boolean;
 }
@@ -23,8 +31,9 @@ interface ChatResponseProps {
 
 /* ─── Sources Accordion ─── */
 
-function SourcesAccordion({ sources, confidence, grounded }: {
+function SourcesAccordion({ sources, documents, confidence, grounded }: {
   sources: Source[];
+  documents?: Document[];
   confidence: number;
   grounded?: boolean;
 }) {
@@ -52,12 +61,27 @@ function SourcesAccordion({ sources, confidence, grounded }: {
     <div className="src-accordion">
       <button className={`src-toggle ${open ? "is-open" : ""}`} onClick={() => setOpen(!open)}>
         <div className="src-pills">
-          <span className="src-pill">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.5 }}>
-              <path d="M4 1.5h6l3 3V13a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 013 13V3A1.5 1.5 0 014 1.5z" stroke="currentColor" strokeWidth="1.3"/>
-              <path d="M10 1.5V5h3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-            </svg>
+          {/* Overlapping icon pill */}
+          <span className="src-icon-pill">
+            <span className="src-icon-stack">
+              <svg className="src-icon-base" width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <path d="M4 1.5h6l3 3V13a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 013 13V3A1.5 1.5 0 014 1.5z" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M10 1.5V5h3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              {documents && documents.length > 0 && (
+                <svg className="src-icon-overlap" width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <path d="M2 4.5A1.5 1.5 0 013.5 3h5A1.5 1.5 0 0110 4.5v.5h1.5A1.5 1.5 0 0113 6.5v6a1.5 1.5 0 01-1.5 1.5h-5A1.5 1.5 0 015 12.5V12H3.5A1.5 1.5 0 012 10.5z" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M7 9h3M7 11h2" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" opacity="0.5"/>
+                </svg>
+              )}
+            </span>
+          </span>
+          {/* Summary text */}
+          <span className="src-summary-text">
             {sources.length} source{sources.length !== 1 ? "s" : ""}
+            {documents && documents.length > 0 && (
+              <> · {documents.length} doc{documents.length !== 1 ? "s" : ""}</>
+            )}
           </span>
           <span className="src-pill src-pill-status" style={{ color: statusColor, borderColor: statusColor }}>
             {statusLabel} {pct}%
@@ -80,6 +104,31 @@ function SourcesAccordion({ sources, confidence, grounded }: {
           {sources.map((s, i) => (
             <SourceRow key={i} source={s} />
           ))}
+
+          {documents && documents.length > 0 && (
+            <div className="src-docs-section">
+              <div className="src-docs-label">DOCUMENTS</div>
+              {documents.map((doc, i) => (
+                <a
+                  key={i}
+                  href={doc.url}
+                  target="_blank"
+                  rel="noopener"
+                  className="src-doc-row"
+                >
+                  <svg className="src-doc-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M4 1.5h6l3 3V13a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 013 13V3A1.5 1.5 0 014 1.5z" stroke="currentColor" strokeWidth="1.2"/>
+                    <path d="M10 1.5V5h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  <span className="src-doc-title">{doc.title}</span>
+                  <span className="src-doc-file">{doc.filename}</span>
+                  <svg className="src-doc-arrow" width="12" height="12" viewBox="0 0 16 16" fill="none">
+                    <path d="M5 11L11 5M11 5H6M11 5v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -182,6 +231,7 @@ export function ChatResponse({ message, isLatest }: ChatResponseProps) {
         {!isUser && message.confidence !== undefined && message.sources && message.sources.length > 0 && (
           <SourcesAccordion
             sources={message.sources}
+            documents={message.documents}
             confidence={message.confidence}
             grounded={message.grounded}
           />
@@ -287,23 +337,39 @@ export function ChatResponse({ message, isLatest }: ChatResponseProps) {
         /* Pills */
         .src-pills {
           display: flex;
-          gap: 6px;
+          gap: 8px;
           align-items: center;
         }
-        .src-pill {
-          display: inline-flex;
+        .src-icon-pill {
+          display: flex;
           align-items: center;
-          gap: 5px;
+        }
+        .src-icon-stack {
+          display: flex;
+          align-items: center;
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 4px 6px;
+          gap: 0;
+          color: var(--text-muted);
+        }
+        .src-icon-base { flex-shrink: 0; }
+        .src-icon-overlap { flex-shrink: 0; margin-left: -4px; }
+        .src-summary-text {
+          font-size: 12.5px;
+          color: var(--text-muted);
+          font-family: var(--font-mono);
+          font-weight: 500;
+        }
+        .src-pill-status {
+          display: inline-flex;
           font-family: var(--font-mono);
           font-size: 12px;
           font-weight: 500;
           padding: 4px 11px;
           border-radius: 20px;
           line-height: 1.3;
-          color: var(--text-muted);
-          border: 1px solid var(--border-light);
-        }
-        .src-pill-status {
           border: 1px solid;
           background: none;
         }
@@ -401,6 +467,64 @@ export function ChatResponse({ message, isLatest }: ChatResponseProps) {
           line-height: 1.7;
           color: var(--text-muted);
           margin: 0;
+        }
+
+        /* Documents section */
+        .src-docs-section {
+          margin-top: 8px;
+          padding-top: 8px;
+          border-top: 1px solid var(--border);
+        }
+        .src-docs-label {
+          font-family: var(--font-mono);
+          font-size: 9px;
+          font-weight: 500;
+          color: var(--text-dim);
+          letter-spacing: 0.12em;
+          margin-bottom: 6px;
+        }
+        .src-doc-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 7px 4px;
+          text-decoration: none;
+          border-radius: 4px;
+          transition: background 0.1s;
+        }
+        .src-doc-row:hover {
+          background: rgba(255,255,255,0.025);
+        }
+        .src-doc-row + .src-doc-row {
+          border-top: 1px solid var(--border);
+        }
+        .src-doc-icon {
+          color: var(--accent);
+          flex-shrink: 0;
+          opacity: 0.7;
+        }
+        .src-doc-title {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--text-muted);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .src-doc-file {
+          font-family: var(--font-mono);
+          font-size: 10px;
+          color: var(--text-dim);
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        .src-doc-arrow {
+          color: var(--text-dim);
+          flex-shrink: 0;
+          margin-left: auto;
+        }
+        .src-doc-row:hover .src-doc-arrow {
+          color: var(--accent);
         }
       `}</style>
     </div>

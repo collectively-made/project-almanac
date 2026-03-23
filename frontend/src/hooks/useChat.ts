@@ -160,7 +160,11 @@ export function useChat(): UseChatReturn {
                 };
                 setMessages((prev) => {
                   const u = [...prev];
-                  u[u.length - 1] = { ...u[u.length - 1], ...finalMeta };
+                  u[u.length - 1] = {
+                    ...u[u.length - 1],
+                    ...finalMeta,
+                    documents: parsed.documents,
+                  };
                   return u;
                 });
               } else if (parsed.event === "profile_saved") {

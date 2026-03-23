@@ -51,7 +51,8 @@ class VectorStore:
                 section TEXT NOT NULL DEFAULT '',
                 domain TEXT NOT NULL DEFAULT '',
                 safety_tier TEXT NOT NULL DEFAULT 'guarded',
-                pack_id TEXT NOT NULL DEFAULT ''
+                pack_id TEXT NOT NULL DEFAULT '',
+                source_file TEXT NOT NULL DEFAULT ''
             )
         """)
         # Vector index — float32 for simplicity and compatibility
@@ -81,8 +82,8 @@ class VectorStore:
                 # Insert metadata
                 conn.execute(
                     """INSERT OR REPLACE INTO chunks
-                    (chunk_id, text, source, section, domain, safety_tier, pack_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (chunk_id, text, source, section, domain, safety_tier, pack_id, source_file)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         chunk["chunk_id"],
                         chunk["text"],
@@ -91,6 +92,7 @@ class VectorStore:
                         chunk.get("domain", ""),
                         chunk.get("safety_tier", "guarded"),
                         pack_id,
+                        chunk.get("source_file", ""),
                     ),
                 )
                 rowid = conn.execute(
@@ -136,7 +138,9 @@ class VectorStore:
                 chunks.text,
                 chunks.source,
                 chunks.section,
-                chunks.safety_tier
+                chunks.safety_tier,
+                chunks.source_file,
+                chunks.pack_id
             FROM chunks_vec
             JOIN chunks ON chunks.rowid = chunks_vec.rowid
             WHERE embedding MATCH ? AND k = ?
@@ -147,7 +151,7 @@ class VectorStore:
 
         results = []
         for row in rows:
-            rowid, distance, chunk_id, text, source, section, safety_tier = row
+            rowid, distance, chunk_id, text, source, section, safety_tier, source_file, pack_id = row
             if domain and domain not in text.lower():
                 continue
             # Convert distance to similarity score (1 / (1 + distance))
@@ -162,6 +166,8 @@ class VectorStore:
                     dense_score=score,
                     sparse_score=0.0,
                     safety_tier=safety_tier,
+                    source_file=source_file or "",
+                    pack_id=pack_id or "",
                 )
             )
             if len(results) >= top_k:

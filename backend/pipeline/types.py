@@ -16,3 +16,5 @@ class ScoredChunk:
     dense_score: float = 0.0
     sparse_score: float = 0.0
     safety_tier: SafetyTier = "guarded"
+    source_file: str = ""  # Filename of the original document (PDF etc.)
+    pack_id: str = ""  # Which content pack this came from

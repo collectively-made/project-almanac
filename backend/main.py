@@ -15,6 +15,7 @@ from backend.api.context import router as context_router
 from backend.api.health import router as health_router
 from backend.api.models import router as models_router
 from backend.api.profile_chat import router as profile_chat_router
+from backend.api.files import router as files_router
 from backend.api.setup import router as setup_router
 from backend.api.threads import router as threads_router
 from backend.config import settings
@@ -68,7 +69,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "script-src 'self'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
-            "img-src 'self' data:; "
+            "img-src 'self' data: blob:; "
+            "object-src 'self'; "
             "connect-src 'self'"
         )
         return response
@@ -184,6 +186,7 @@ def create_app() -> FastAPI:
     app.include_router(models_router)
     app.include_router(setup_router)
     app.include_router(context_router)
+    app.include_router(files_router)
     app.include_router(profile_chat_router)
     app.include_router(threads_router)
 
