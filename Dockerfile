@@ -26,6 +26,8 @@ WORKDIR /app
 
 # Python deps (cached layer)
 COPY backend/requirements.txt ./requirements.txt
+# Build llama-cpp-python with generic CPU flags (works on all architectures)
+ENV CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF"
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend source
