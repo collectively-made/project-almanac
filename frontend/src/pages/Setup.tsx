@@ -36,6 +36,7 @@ export function Setup({ onReady }: SetupProps) {
   const [step, setStep] = useState<Step>("loading");
   const [error, setError] = useState("");
   const [downloadProgress, setDownloadProgress] = useState("");
+  const [loadingModel, setLoadingModel] = useState("");
 
   const fetchStatus = async () => {
     try {
@@ -111,7 +112,7 @@ export function Setup({ onReady }: SetupProps) {
   };
 
   const handleLoad = async (name: string) => {
-    setStep("loading-model");
+    setLoadingModel(name);
     setError("");
     try {
       const r = await fetch("/api/models/load", {
@@ -123,11 +124,11 @@ export function Setup({ onReady }: SetupProps) {
       else {
         const d = await r.json();
         setError(d.detail || "Failed to load model");
-        setStep("has-model");
+        setLoadingModel("");
       }
     } catch {
       setError("Failed to load model");
-      setStep("has-model");
+      setLoadingModel("");
     }
   };
 
@@ -183,8 +184,21 @@ export function Setup({ onReady }: SetupProps) {
                     <span className="su-model-name">{m.name}</span>
                     <span className="su-model-badge">{Math.round(m.size_mb)} MB</span>
                   </div>
-                  <button className="su-btn" onClick={() => handleLoad(m.name)}>
-                    Load & Start
+                  <button
+                    className="su-btn"
+                    onClick={() => handleLoad(m.name)}
+                    disabled={!!loadingModel}
+                  >
+                    {loadingModel === m.name ? (
+                      <span className="su-btn-loading">
+                        <span className="su-btn-spinner" />
+                        Loading...
+                      </span>
+                    ) : loadingModel ? (
+                      "Wait..."
+                    ) : (
+                      "Load & Start"
+                    )}
                   </button>
                 </div>
               ))}
@@ -305,8 +319,11 @@ export function Setup({ onReady }: SetupProps) {
         .su-model-desc { font-size:12px; color:var(--text-muted); margin-top:2px; }
         .su-model-size { font-family:var(--font-mono); font-size:11px; color:var(--text-dim); margin-top:2px; }
 
-        .su-btn { padding:8px 16px; background:var(--accent); color:var(--bg); border:none; border-radius:6px; font-family:var(--font-mono); font-size:12px; font-weight:500; cursor:pointer; flex-shrink:0; transition:filter 0.15s; letter-spacing:0.04em; }
+        .su-btn { padding:8px 16px; background:var(--accent); color:var(--bg); border:none; border-radius:6px; font-family:var(--font-mono); font-size:12px; font-weight:500; cursor:pointer; flex-shrink:0; transition:filter 0.15s; letter-spacing:0.04em; min-width:100px; text-align:center; }
         .su-btn:hover { filter:brightness(1.1); }
+        .su-btn:disabled { opacity:0.7; cursor:wait; }
+        .su-btn-loading { display:inline-flex; align-items:center; gap:6px; }
+        .su-btn-spinner { width:12px; height:12px; border:2px solid rgba(0,0,0,0.2); border-top-color:var(--bg); border-radius:50%; animation:spin 0.8s linear infinite; }
         .su-btn-link { padding:8px 14px; background:none; color:var(--accent); border:1px solid var(--accent); border-radius:6px; font-family:var(--font-mono); font-size:11px; font-weight:500; text-decoration:none; flex-shrink:0; transition:all 0.15s; white-space:nowrap; }
         .su-btn-link:hover { background:var(--accent); color:var(--bg); }
 
