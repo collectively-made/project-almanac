@@ -31,6 +31,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend source
 COPY backend/ ./backend/
 
+# Copy builtin content packs (knowledge base + PDFs)
+COPY builtin/ ./builtin/
+
 # Copy built frontend from stage 1
 COPY --from=frontend-build /app/frontend/dist ./static/
 
