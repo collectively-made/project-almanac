@@ -173,36 +173,35 @@ export function Setup({ onReady }: SetupProps) {
         {/* Has model in volume — just needs to load */}
         {step === "has-model" && status && (
           <>
-            <div className="su-section">
-              <div className="su-label">MODEL FOUND</div>
-              <p className="su-muted" style={{ marginBottom: 12 }}>
-                A model is available and ready to load.
-              </p>
-              {status.available_models.map((m) => (
-                <div key={m.name} className="su-model-row">
-                  <div>
-                    <span className="su-model-name">{m.name}</span>
-                    <span className="su-model-badge">{Math.round(m.size_mb)} MB</span>
+            {loadingModel ? (
+              <div className="su-center">
+                <div className="su-load-progress">
+                  <div className="su-load-bar">
+                    <div className="su-load-bar-fill" />
                   </div>
-                  <button
-                    className="su-btn"
-                    onClick={() => handleLoad(m.name)}
-                    disabled={!!loadingModel}
-                  >
-                    {loadingModel === m.name ? (
-                      <span className="su-btn-loading">
-                        <span className="su-btn-spinner" />
-                        Loading...
-                      </span>
-                    ) : loadingModel ? (
-                      "Wait..."
-                    ) : (
-                      "Load & Start"
-                    )}
-                  </button>
+                  <p className="su-text">Loading {loadingModel}...</p>
+                  <p className="su-muted">Initializing the AI model. This can take 10–60 seconds depending on model size and hardware.</p>
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className="su-section">
+                <div className="su-label">MODEL FOUND</div>
+                <p className="su-muted" style={{ marginBottom: 12 }}>
+                  A model is available and ready to load.
+                </p>
+                {status.available_models.map((m) => (
+                  <div key={m.name} className="su-model-row">
+                    <div>
+                      <span className="su-model-name">{m.name}</span>
+                      <span className="su-model-badge">{Math.round(m.size_mb)} MB</span>
+                    </div>
+                    <button className="su-btn" onClick={() => handleLoad(m.name)}>
+                      Load & Start
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             {error && <p className="su-error">{error}</p>}
           </>
         )}
@@ -339,6 +338,11 @@ export function Setup({ onReady }: SetupProps) {
         .su-text { font-size:14px; color:var(--text); margin-bottom:6px; }
         .su-spinner { width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
         @keyframes spin { to { transform:rotate(360deg); } }
+
+        .su-load-progress { padding:8px 0; }
+        .su-load-bar { width:100%; height:4px; background:var(--border); border-radius:2px; overflow:hidden; margin-bottom:16px; }
+        .su-load-bar-fill { height:100%; width:30%; background:var(--accent); border-radius:2px; animation:loadSlide 2s ease-in-out infinite; }
+        @keyframes loadSlide { 0% { width:10%; margin-left:0; } 50% { width:40%; margin-left:30%; } 100% { width:10%; margin-left:90%; } }
 
         .su-error { font-size:12px; color:var(--danger); margin-top:8px; text-align:center; }
       `}</style>
