@@ -6,13 +6,20 @@ interface SetupStatus {
   model_loaded: boolean;
   available_models: { name: string; size_mb: number }[];
   indexed_chunks: number;
-  hardware: { ram_gb: number; cpu_count: number };
+  hardware: { ram_gb: number; cpu_count: number; gpu?: string; unified_memory?: boolean };
   recommended_models: {
     name: string;
-    description: string;
-    size_gb: number;
-    url: string;
+    provider: string;
     parameters: string;
+    quantization: string;
+    context_length: number;
+    min_ram_gb: number;
+    score: number;
+    estimated_tps: number;
+    fit_level: string;
+    gguf_repo: string;
+    gguf_url: string;
+    use_case: string;
   }[];
 }
 
@@ -20,12 +27,11 @@ interface SetupProps {
   onReady: () => void;
 }
 
-type Step = "loading" | "needs-model" | "has-model" | "downloading" | "loading-model";
+type Step = "loading" | "needs-model" | "has-model" | "loading-model";
 
 export function Setup({ onReady }: SetupProps) {
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [step, setStep] = useState<Step>("loading");
-  const [downloadProgress, setDownloadProgress] = useState("");
   const [error, setError] = useState("");
 
   const fetchStatus = async () => {
@@ -47,51 +53,6 @@ export function Setup({ onReady }: SetupProps) {
     const id = setInterval(fetchStatus, 4000);
     return () => clearInterval(id);
   }, []);
-
-  const handleDownload = async (model: SetupStatus["recommended_models"][0]) => {
-    setStep("downloading");
-    setDownloadProgress("Connecting...");
-    setError("");
-    try {
-      const r = await fetch("/api/setup/download-model", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: model.url, filename: model.name }),
-      });
-      if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
-      const reader = r.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const data = JSON.parse(line.slice(6));
-            if (data.event === "progress") {
-              setDownloadProgress(
-                data.stage === "complete"
-                  ? "Download complete!"
-                  : `Downloading... ${data.size_mb ? data.size_mb + " MB so far" : ""}`
-              );
-            } else if (data.event === "done") {
-              await handleLoad(model.name);
-            } else if (data.event === "error") {
-              setError(data.message || "Download failed");
-              setStep("needs-model");
-            }
-          } catch {}
-        }
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Download failed");
-      setStep("needs-model");
-    }
-  };
 
   const handleLoad = async (name: string) => {
     setStep("loading-model");
@@ -134,15 +95,6 @@ export function Setup({ onReady }: SetupProps) {
           </div>
         )}
 
-        {/* Downloading */}
-        {step === "downloading" && (
-          <div className="su-center">
-            <div className="su-spinner" />
-            <p className="su-text">{downloadProgress}</p>
-            <p className="su-muted">One-time download. The model runs entirely on your device.</p>
-          </div>
-        )}
-
         {/* Loading model into memory */}
         {step === "loading-model" && (
           <div className="su-center">
@@ -181,23 +133,33 @@ export function Setup({ onReady }: SetupProps) {
           <>
             {/* Hardware info */}
             <div className="su-hw">
-              {status.hardware.ram_gb} GB RAM · {status.hardware.cpu_count} CPUs · {status.indexed_chunks} knowledge chunks
+              {status.hardware.ram_gb} GB RAM · {status.hardware.cpu_count} CPUs
+              {status.hardware.gpu ? ` · ${status.hardware.gpu}` : ""}
+              {" · "}{status.indexed_chunks} knowledge chunks
             </div>
 
-            {/* Option 1: Quick download */}
+            {/* Option 1: Recommended models from llmfit database */}
             {status.recommended_models.length > 0 && (
               <div className="su-section">
                 <div className="su-label">RECOMMENDED FOR YOUR HARDWARE</div>
+                <p className="su-muted" style={{ marginBottom: 12, fontSize: 12 }}>
+                  Scored by quality, speed, and memory fit. Click a model to visit its download page.
+                </p>
                 {status.recommended_models.map((m) => (
                   <div key={m.name} className="su-model-row">
-                    <div>
-                      <span className="su-model-name">{m.parameters}</span>
-                      <p className="su-model-desc">{m.description}</p>
-                      <p className="su-model-size">{m.size_gb} GB download</p>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span className="su-model-name">{m.name.split("/").pop()}</span>
+                        <span className="su-model-badge">{m.parameters}</span>
+                        <span className="su-model-badge" style={{ borderColor: "var(--sage-dim)", color: "var(--sage-bright)" }}>{m.fit_level}</span>
+                      </div>
+                      <p className="su-model-desc">
+                        {m.provider} · {m.quantization} · {m.min_ram_gb} GB RAM · ~{Math.round(m.estimated_tps)} tok/s
+                      </p>
                     </div>
-                    <button className="su-btn" onClick={() => handleDownload(m)}>
-                      Download
-                    </button>
+                    <a href={m.gguf_url} target="_blank" rel="noopener" className="su-btn-link">
+                      Get model ↗
+                    </a>
                   </div>
                 ))}
               </div>
@@ -273,6 +235,8 @@ export function Setup({ onReady }: SetupProps) {
 
         .su-btn { padding:8px 16px; background:var(--accent); color:var(--bg); border:none; border-radius:6px; font-family:var(--font-mono); font-size:12px; font-weight:500; cursor:pointer; flex-shrink:0; transition:filter 0.15s; letter-spacing:0.04em; }
         .su-btn:hover { filter:brightness(1.1); }
+        .su-btn-link { padding:8px 14px; background:none; color:var(--accent); border:1px solid var(--accent); border-radius:6px; font-family:var(--font-mono); font-size:11px; font-weight:500; text-decoration:none; flex-shrink:0; transition:all 0.15s; white-space:nowrap; }
+        .su-btn-link:hover { background:var(--accent); color:var(--bg); }
 
         .su-instructions { font-size:13px; color:var(--text-muted); line-height:1.6; }
         .su-instructions p { margin-bottom:8px; }

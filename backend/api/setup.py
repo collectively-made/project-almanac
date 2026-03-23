@@ -14,32 +14,10 @@ from backend.dependencies import get_llm_manager, get_vectorstore
 from backend.llm.manager import LLMManager, _get_available_ram_gb
 from backend.rag.vectorstore import VectorStore
 
+from backend.llm.recommender import recommend_models
+
 logger = logging.getLogger("almanac.setup")
 router = APIRouter()
-
-# Recommended models manifest — SHA256 pinned to specific HuggingFace files
-RECOMMENDED_MODELS = [
-    {
-        "name": "Phi-3-mini-4k-instruct-q4.gguf",
-        "description": "Microsoft Phi-3 Mini (3.8B) — best for 8GB devices",
-        "size_gb": 2.2,
-        "min_ram_gb": 6,
-        "parameters": "3.8B",
-        "quantization": "Q4_K_M",
-        "url": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf",
-        "sha256": None,  # Will be populated when we pin a specific revision
-    },
-    {
-        "name": "Qwen2.5-3B-Instruct-Q4_K_M.gguf",
-        "description": "Qwen 2.5 (3B) — good quality, small footprint",
-        "size_gb": 1.8,
-        "min_ram_gb": 6,
-        "parameters": "3B",
-        "quantization": "Q4_K_M",
-        "url": "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf",
-        "sha256": None,
-    },
-]
 
 
 @router.get("/api/setup/status")
@@ -61,10 +39,23 @@ async def setup_status(
     else:
         status = "ready"
 
-    # Filter recommended models by hardware
-    suitable_models = [
-        m for m in RECOMMENDED_MODELS if m["min_ram_gb"] <= ram_gb
-    ]
+    import os
+    import platform
+
+    # Get hardware-aware recommendations from llmfit model database
+    total_ram = ram_gb
+    # Detect GPU/unified memory
+    is_apple_silicon = platform.processor() == "arm" or "apple" in platform.platform().lower()
+    has_gpu = is_apple_silicon  # Simplified — Apple Silicon has Metal
+    unified = is_apple_silicon
+
+    recommendations = recommend_models(
+        available_ram_gb=total_ram,
+        has_gpu=has_gpu,
+        gpu_vram_gb=total_ram if unified else 0,
+        unified_memory=unified,
+        max_results=5,
+    )
 
     return {
         "status": status,
@@ -74,9 +65,11 @@ async def setup_status(
         "indexed_chunks": chunks,
         "hardware": {
             "ram_gb": round(ram_gb, 1),
-            "cpu_count": __import__("os").cpu_count(),
+            "cpu_count": os.cpu_count(),
+            "gpu": "Apple Silicon (Metal)" if is_apple_silicon else "CPU only",
+            "unified_memory": unified,
         },
-        "recommended_models": suitable_models,
+        "recommended_models": recommendations,
     }
 
 
