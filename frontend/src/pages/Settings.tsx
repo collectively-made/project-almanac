@@ -101,12 +101,12 @@ export function Settings({ onBack, onProfile }: SettingsProps) {
           <div className="info-row">
             <span className="info-key">Source</span>
             <a
-              href="https://github.com/alexanderussell/survival-app"
+              href="https://github.com/collectively-made/project-almanac"
               target="_blank"
               rel="noopener"
               className="info-link"
             >
-              github.com/alexanderussell/survival-app
+              github.com/collectively-made/project-almanac
             </a>
           </div>
         </section>

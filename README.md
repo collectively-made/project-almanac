@@ -15,7 +15,7 @@ docker run -d \
   -v almanac-config:/app/config \
   -v almanac-models:/app/models \
   -v almanac-content:/app/content \
-  ghcr.io/project-almanac/almanac:latest
+  ghcr.io/collectively-made/project-almanac:latest
 ```
 
 Open **http://localhost:8080**. The setup wizard will walk you through downloading a model — one button, no configuration needed.
@@ -25,7 +25,7 @@ Open **http://localhost:8080**. The setup wizard will walk you through downloadi
 ```yaml
 services:
   almanac:
-    image: ghcr.io/project-almanac/almanac:latest
+    image: ghcr.io/collectively-made/project-almanac:latest
     ports:
       - "8080:8080"
     volumes:
