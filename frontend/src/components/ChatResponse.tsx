@@ -62,20 +62,22 @@ function SourcesAccordion({ sources, documents, confidence, grounded }: {
     <div className="src-accordion">
       <button className={`src-toggle ${open ? "is-open" : ""}`} onClick={() => setOpen(!open)}>
         <div className="src-pills">
-          {/* Overlapping icon pill */}
-          <span className="src-icon-pill">
-            <span className="src-icon-stack">
-              <svg className="src-icon-base" width="13" height="13" viewBox="0 0 16 16" fill="none">
+          {/* Overlapping icon pills */}
+          <span className="src-icon-group">
+            <span className="src-icon-chip">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                 <path d="M4 1.5h6l3 3V13a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 013 13V3A1.5 1.5 0 014 1.5z" stroke="currentColor" strokeWidth="1.3"/>
                 <path d="M10 1.5V5h3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
               </svg>
-              {documents && documents.length > 0 && (
-                <svg className="src-icon-overlap" width="13" height="13" viewBox="0 0 16 16" fill="none">
+            </span>
+            {documents && documents.length > 0 && (
+              <span className="src-icon-chip src-icon-chip-overlap">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                   <path d="M2 4.5A1.5 1.5 0 013.5 3h5A1.5 1.5 0 0110 4.5v.5h1.5A1.5 1.5 0 0113 6.5v6a1.5 1.5 0 01-1.5 1.5h-5A1.5 1.5 0 015 12.5V12H3.5A1.5 1.5 0 012 10.5z" stroke="currentColor" strokeWidth="1.2"/>
                   <path d="M7 9h3M7 11h2" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" opacity="0.5"/>
                 </svg>
-              )}
-            </span>
+              </span>
+            )}
           </span>
           {/* Summary text */}
           <span className="src-summary-text">
@@ -353,22 +355,29 @@ export function ChatResponse({ message, isLatest }: ChatResponseProps) {
           gap: 8px;
           align-items: center;
         }
-        .src-icon-pill {
+        .src-icon-group {
           display: flex;
           align-items: center;
+          position: relative;
         }
-        .src-icon-stack {
+        .src-icon-chip {
           display: flex;
           align-items: center;
+          justify-content: center;
+          width: 28px;
+          height: 28px;
           background: var(--bg-card);
           border: 1px solid var(--border);
-          border-radius: 16px;
-          padding: 4px 6px;
-          gap: 0;
+          border-radius: 50%;
           color: var(--text-muted);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+          position: relative;
+          z-index: 2;
         }
-        .src-icon-base { flex-shrink: 0; }
-        .src-icon-overlap { flex-shrink: 0; margin-left: -4px; }
+        .src-icon-chip-overlap {
+          margin-left: -8px;
+          z-index: 1;
+        }
         .src-summary-text {
           font-size: 12.5px;
           color: var(--text-muted);
