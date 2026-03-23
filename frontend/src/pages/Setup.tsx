@@ -20,9 +20,11 @@ interface SetupProps {
   onReady: () => void;
 }
 
+type Step = "loading" | "needs-model" | "has-model" | "downloading" | "loading-model";
+
 export function Setup({ onReady }: SetupProps) {
   const [status, setStatus] = useState<SetupStatus | null>(null);
-  const [step, setStep] = useState<"loading" | "welcome" | "downloading" | "load" | "loading-model">("loading");
+  const [step, setStep] = useState<Step>("loading");
   const [downloadProgress, setDownloadProgress] = useState("");
   const [error, setError] = useState("");
 
@@ -31,33 +33,25 @@ export function Setup({ onReady }: SetupProps) {
       const r = await fetch("/api/setup/status");
       const data = await r.json();
       setStatus(data);
-      if (data.status === "ready") {
-        onReady();
-      } else if (data.status === "model_available") {
-        setStep("load");
-      } else {
-        setStep("welcome");
-      }
+      if (data.status === "ready") onReady();
+      else if (data.status === "model_available") setStep("has-model");
+      else setStep("needs-model");
     } catch {
-      setError("Cannot connect to backend. Is it running?");
-      setStep("welcome");
+      setError("Cannot connect to backend");
+      setStep("needs-model");
     }
   };
 
   useEffect(() => {
     fetchStatus();
-    // Poll while on loading/welcome — auto-download may complete on backend
-    const interval = setInterval(fetchStatus, 4000);
-    return () => clearInterval(interval);
+    const id = setInterval(fetchStatus, 4000);
+    return () => clearInterval(id);
   }, []);
 
-  const handleQuickStart = async () => {
-    if (!status || status.recommended_models.length === 0) return;
-    const model = status.recommended_models[0]; // Best match for hardware
+  const handleDownload = async (model: SetupStatus["recommended_models"][0]) => {
     setStep("downloading");
     setDownloadProgress("Connecting...");
     setError("");
-
     try {
       const r = await fetch("/api/setup/download-model", {
         method: "POST",
@@ -81,348 +75,219 @@ export function Setup({ onReady }: SetupProps) {
             if (data.event === "progress") {
               setDownloadProgress(
                 data.stage === "complete"
-                  ? "Download complete. Loading model..."
-                  : `Downloading AI model (${data.size_mb ? data.size_mb + " MB" : "this may take a few minutes"})...`
+                  ? "Download complete!"
+                  : `Downloading... ${data.size_mb ? data.size_mb + " MB so far" : ""}`
               );
             } else if (data.event === "done") {
-              setDownloadProgress("Download complete. Loading model...");
-              await handleAutoLoad(model.name);
+              await handleLoad(model.name);
             } else if (data.event === "error") {
-              setError(data.message);
-              setStep("welcome");
+              setError(data.message || "Download failed");
+              setStep("needs-model");
             }
           } catch {}
         }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Download failed");
-      setStep("welcome");
+      setStep("needs-model");
     }
   };
 
-  const handleAutoLoad = async (name: string) => {
+  const handleLoad = async (name: string) => {
     setStep("loading-model");
+    setError("");
     try {
       const r = await fetch("/api/models/load", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      if (r.ok) {
-        onReady();
-      } else {
+      if (r.ok) onReady();
+      else {
         const d = await r.json();
         setError(d.detail || "Failed to load model");
-        setStep("welcome");
+        setStep("has-model");
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Load failed");
-      setStep("welcome");
+    } catch {
+      setError("Failed to load model");
+      setStep("has-model");
     }
   };
 
-  const handleLoadExisting = async () => {
-    if (!status || status.available_models.length === 0) return;
-    await handleAutoLoad(status.available_models[0].name);
-  };
-
-  const bestModel = status?.recommended_models?.[0];
-
   return (
-    <div className="setup-page">
-      <div className="setup-card">
-        {/* Header — always visible */}
-        <div className="setup-header">
-          <div className="setup-mark" />
+    <div className="su-page">
+      <div className="su-card">
+        {/* Header */}
+        <div className="su-header">
+          <div className="su-mark" />
           <div>
-            <h1 className="setup-title">ALMANAC</h1>
-            <p className="setup-sub">Offline survival knowledge, grounded in real sources</p>
+            <h1 className="su-title">ALMANAC</h1>
+            <p className="su-sub">Offline survival knowledge, grounded in real sources</p>
           </div>
         </div>
 
-        {/* Step: Loading / auto-setup in progress */}
+        {/* Loading */}
         {step === "loading" && (
-          <div className="setup-center">
-            <div className="setup-spinner" />
-            <p className="setup-status-text">Setting up Almanac...</p>
-            <p className="setup-status-sub">
-              If this is the first run, the AI model is being downloaded automatically.
-              This may take a few minutes.
-            </p>
+          <div className="su-center">
+            <div className="su-spinner" />
+            <p className="su-text">Connecting...</p>
           </div>
         )}
 
-        {/* Step: Welcome — needs model */}
-        {step === "welcome" && (
+        {/* Downloading */}
+        {step === "downloading" && (
+          <div className="su-center">
+            <div className="su-spinner" />
+            <p className="su-text">{downloadProgress}</p>
+            <p className="su-muted">One-time download. The model runs entirely on your device.</p>
+          </div>
+        )}
+
+        {/* Loading model into memory */}
+        {step === "loading-model" && (
+          <div className="su-center">
+            <div className="su-spinner" />
+            <p className="su-text">Loading model into memory...</p>
+            <p className="su-muted">This takes 10–30 seconds depending on your hardware.</p>
+          </div>
+        )}
+
+        {/* Has model in volume — just needs to load */}
+        {step === "has-model" && status && (
           <>
-            <div className="setup-steps">
-              <div className="setup-step done">
-                <div className="step-num">1</div>
-                <div className="step-info">
-                  <span className="step-title">Server running</span>
-                  <span className="step-detail">
-                    {status ? `${status.hardware.ram_gb} GB RAM · ${status.indexed_chunks} knowledge chunks loaded` : ""}
-                  </span>
-                </div>
-              </div>
-              <div className="setup-step active">
-                <div className="step-num">2</div>
-                <div className="step-info">
-                  <span className="step-title">Install an AI model</span>
-                  <span className="step-detail">
-                    {bestModel
-                      ? `Recommended: ${bestModel.description} (${bestModel.size_gb} GB download)`
-                      : "A language model is needed for answering questions"}
-                  </span>
-                </div>
-              </div>
-              <div className="setup-step">
-                <div className="step-num">3</div>
-                <div className="step-info">
-                  <span className="step-title">Start asking questions</span>
-                </div>
-              </div>
-            </div>
-
-            {bestModel && (
-              <button className="setup-cta" onClick={handleQuickStart}>
-                Download & Start
-              </button>
-            )}
-
-            <details className="setup-advanced">
-              <summary>Advanced: use your own model</summary>
-              <p>
-                Place any GGUF model file in the <code>models</code> volume directory, then restart.
-                Recommended: 3B–7B parameter models in Q4 quantization.
+            <div className="su-section">
+              <div className="su-label">MODEL FOUND</div>
+              <p className="su-muted" style={{ marginBottom: 12 }}>
+                A model is available and ready to load.
               </p>
-            </details>
-
-            {error && <p className="setup-error">{error}</p>}
+              {status.available_models.map((m) => (
+                <div key={m.name} className="su-model-row">
+                  <div>
+                    <span className="su-model-name">{m.name}</span>
+                    <span className="su-model-badge">{Math.round(m.size_mb)} MB</span>
+                  </div>
+                  <button className="su-btn" onClick={() => handleLoad(m.name)}>
+                    Load & Start
+                  </button>
+                </div>
+              ))}
+            </div>
+            {error && <p className="su-error">{error}</p>}
           </>
         )}
 
-        {/* Step: Downloading */}
-        {step === "downloading" && (
-          <div className="setup-center">
-            <div className="setup-spinner" />
-            <p className="setup-status-text">{downloadProgress}</p>
-            <p className="setup-status-sub">This is a one-time download. The model runs entirely on your device.</p>
-          </div>
-        )}
+        {/* Needs model — show options */}
+        {step === "needs-model" && status && (
+          <>
+            {/* Hardware info */}
+            <div className="su-hw">
+              {status.hardware.ram_gb} GB RAM · {status.hardware.cpu_count} CPUs · {status.indexed_chunks} knowledge chunks
+            </div>
 
-        {/* Step: Model available, loading */}
-        {step === "load" && (
-          <div className="setup-center">
-            <p className="setup-status-text">Model found. Ready to load.</p>
-            {status && status.available_models.length > 0 && (
-              <p className="setup-status-sub">{status.available_models[0].name}</p>
+            {/* Option 1: Quick download */}
+            {status.recommended_models.length > 0 && (
+              <div className="su-section">
+                <div className="su-label">RECOMMENDED FOR YOUR HARDWARE</div>
+                {status.recommended_models.map((m) => (
+                  <div key={m.name} className="su-model-row">
+                    <div>
+                      <span className="su-model-name">{m.parameters}</span>
+                      <p className="su-model-desc">{m.description}</p>
+                      <p className="su-model-size">{m.size_gb} GB download</p>
+                    </div>
+                    <button className="su-btn" onClick={() => handleDownload(m)}>
+                      Download
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
-            <button className="setup-cta" onClick={handleLoadExisting}>
-              Load & Start
-            </button>
-            {error && <p className="setup-error">{error}</p>}
-          </div>
-        )}
 
-        {/* Step: Loading model into memory */}
-        {step === "loading-model" && (
-          <div className="setup-center">
-            <div className="setup-spinner" />
-            <p className="setup-status-text">Loading model into memory...</p>
-            <p className="setup-status-sub">This takes 10–30 seconds depending on your hardware.</p>
-          </div>
+            {/* Option 2: Already have a model */}
+            {status.available_models.length > 0 && (
+              <div className="su-section">
+                <div className="su-label">MODELS IN VOLUME</div>
+                {status.available_models.map((m) => (
+                  <div key={m.name} className="su-model-row">
+                    <div>
+                      <span className="su-model-name">{m.name}</span>
+                      <span className="su-model-badge">{Math.round(m.size_mb)} MB</span>
+                    </div>
+                    <button className="su-btn" onClick={() => handleLoad(m.name)}>
+                      Load
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Option 3: Manual instructions */}
+            <div className="su-section">
+              <div className="su-label">ADD YOUR OWN MODEL</div>
+              <div className="su-instructions">
+                <p>Place a GGUF model file in the models volume:</p>
+                <code className="su-code">
+                  {typeof window !== "undefined" && window.location.port === "5173"
+                    ? "models/"
+                    : "/app/models/"
+                  }
+                </code>
+                <p>Then refresh this page. Recommended sources:</p>
+                <ul>
+                  <li>
+                    <a href="https://huggingface.co/models?search=gguf" target="_blank" rel="noopener">
+                      HuggingFace GGUF models ↗
+                    </a>
+                  </li>
+                </ul>
+                <p className="su-tip">
+                  Look for Q4_K_M quantization. 3B models work on 8GB RAM, 7B models need 16GB+.
+                </p>
+              </div>
+            </div>
+
+            {error && <p className="su-error">{error}</p>}
+          </>
         )}
       </div>
 
       <style>{`
-        .setup-page {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-          padding: 24px;
-          animation: fadeInUp 0.4s ease;
-        }
-        .setup-card {
-          max-width: 480px;
-          width: 100%;
-          background: var(--bg-elevated);
-          border: 1px solid var(--border);
-          border-radius: 10px;
-          padding: 36px;
-        }
-        .setup-header {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          margin-bottom: 32px;
-        }
-        .setup-mark {
-          width: 5px;
-          height: 32px;
-          background: var(--accent);
-          border-radius: 2px;
-          flex-shrink: 0;
-        }
-        .setup-title {
-          font-family: var(--font-mono);
-          font-size: 18px;
-          font-weight: 500;
-          letter-spacing: 0.14em;
-          color: var(--text-bright);
-          line-height: 1.2;
-        }
-        .setup-sub {
-          font-size: 13px;
-          color: var(--text-muted);
-          margin-top: 3px;
-        }
+        .su-page { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px; animation:fadeInUp 0.4s ease; }
+        .su-card { max-width:500px; width:100%; background:var(--bg-elevated); border:1px solid var(--border); border-radius:10px; padding:32px; }
+        .su-header { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
+        .su-mark { width:5px; height:32px; background:var(--accent); border-radius:2px; flex-shrink:0; }
+        .su-title { font-family:var(--font-mono); font-size:18px; font-weight:500; letter-spacing:0.14em; color:var(--text-bright); }
+        .su-sub { font-size:13px; color:var(--text-muted); margin-top:3px; }
 
-        /* Steps */
-        .setup-steps {
-          display: flex;
-          flex-direction: column;
-          gap: 0;
-          margin-bottom: 28px;
-        }
-        .setup-step {
-          display: flex;
-          align-items: flex-start;
-          gap: 14px;
-          padding: 12px 0;
-          border-bottom: 1px solid var(--border);
-          opacity: 0.35;
-        }
-        .setup-step:last-child { border-bottom: none; }
-        .setup-step.done {
-          opacity: 0.6;
-        }
-        .setup-step.active {
-          opacity: 1;
-        }
-        .step-num {
-          width: 24px;
-          height: 24px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          border: 1px solid var(--border-light);
-          font-family: var(--font-mono);
-          font-size: 11px;
-          color: var(--text-dim);
-          flex-shrink: 0;
-          margin-top: 1px;
-        }
-        .setup-step.done .step-num {
-          background: var(--sage-dim);
-          border-color: var(--sage);
-          color: var(--sage-bright);
-        }
-        .setup-step.active .step-num {
-          background: var(--accent-dim);
-          border-color: var(--accent);
-          color: var(--accent);
-        }
-        .step-info {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .step-title {
-          font-size: 14px;
-          font-weight: 500;
-          color: var(--text);
-        }
-        .step-detail {
-          font-size: 12px;
-          color: var(--text-muted);
-          line-height: 1.4;
-        }
+        .su-hw { font-family:var(--font-mono); font-size:11px; color:var(--text-dim); margin-bottom:20px; padding:8px 12px; background:var(--bg); border:1px solid var(--border); border-radius:6px; }
 
-        /* CTA button */
-        .setup-cta {
-          display: block;
-          width: 100%;
-          padding: 12px;
-          background: var(--accent);
-          color: var(--bg);
-          border: none;
-          border-radius: 8px;
-          font-family: var(--font-body);
-          font-size: 15px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: filter 0.15s;
-          margin-bottom: 16px;
-        }
-        .setup-cta:hover { filter: brightness(1.1); }
+        .su-section { margin-bottom:20px; }
+        .su-label { font-family:var(--font-mono); font-size:9.5px; font-weight:500; color:var(--text-dim); letter-spacing:0.12em; margin-bottom:10px; text-transform:uppercase; }
+        .su-muted { font-size:13px; color:var(--text-muted); line-height:1.5; }
 
-        /* Advanced */
-        .setup-advanced {
-          font-size: 12px;
-          color: var(--text-dim);
-        }
-        .setup-advanced summary {
-          cursor: pointer;
-          font-family: var(--font-mono);
-          font-size: 11px;
-          letter-spacing: 0.04em;
-          padding: 4px 0;
-          color: var(--text-muted);
-        }
-        .setup-advanced summary:hover {
-          color: var(--text);
-        }
-        .setup-advanced p {
-          margin-top: 8px;
-          line-height: 1.6;
-          color: var(--text-muted);
-        }
-        .setup-advanced code {
-          font-family: var(--font-mono);
-          background: var(--bg);
-          padding: 1px 6px;
-          border-radius: 3px;
-          font-size: 11px;
-        }
+        .su-model-row { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:var(--bg); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; gap:12px; }
+        .su-model-name { font-family:var(--font-mono); font-size:13px; color:var(--text); font-weight:500; }
+        .su-model-badge { font-family:var(--font-mono); font-size:10px; color:var(--accent); margin-left:8px; padding:1px 6px; border:1px solid var(--accent-dim); border-radius:3px; }
+        .su-model-desc { font-size:12px; color:var(--text-muted); margin-top:2px; }
+        .su-model-size { font-family:var(--font-mono); font-size:11px; color:var(--text-dim); margin-top:2px; }
 
-        /* Center states */
-        .setup-center {
-          text-align: center;
-          padding: 16px 0;
-        }
-        .setup-status-text {
-          font-size: 14px;
-          color: var(--text);
-          margin-bottom: 6px;
-        }
-        .setup-status-sub {
-          font-size: 12px;
-          color: var(--text-muted);
-          margin-bottom: 16px;
-          line-height: 1.5;
-        }
-        .setup-spinner {
-          width: 24px;
-          height: 24px;
-          border: 2px solid var(--border);
-          border-top-color: var(--accent);
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-          margin: 0 auto 16px;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
+        .su-btn { padding:8px 16px; background:var(--accent); color:var(--bg); border:none; border-radius:6px; font-family:var(--font-mono); font-size:12px; font-weight:500; cursor:pointer; flex-shrink:0; transition:filter 0.15s; letter-spacing:0.04em; }
+        .su-btn:hover { filter:brightness(1.1); }
 
-        .setup-error {
-          font-size: 12px;
-          color: var(--danger);
-          margin-top: 12px;
-          text-align: center;
-        }
+        .su-instructions { font-size:13px; color:var(--text-muted); line-height:1.6; }
+        .su-instructions p { margin-bottom:8px; }
+        .su-instructions ul { margin:0 0 8px 20px; }
+        .su-instructions a { color:var(--accent); text-decoration:none; }
+        .su-instructions a:hover { text-decoration:underline; }
+        .su-code { display:block; font-family:var(--font-mono); font-size:12px; background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:8px 12px; margin:6px 0 12px; color:var(--text-bright); }
+        .su-tip { font-size:11px; color:var(--text-dim); font-style:italic; }
+
+        .su-center { text-align:center; padding:20px 0; }
+        .su-text { font-size:14px; color:var(--text); margin-bottom:6px; }
+        .su-spinner { width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 16px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+
+        .su-error { font-size:12px; color:var(--danger); margin-top:8px; text-align:center; }
       `}</style>
     </div>
   );
