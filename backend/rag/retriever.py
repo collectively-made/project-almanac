@@ -53,6 +53,8 @@ def _reciprocal_rank_fusion(
                 dense_score=original.dense_score,
                 sparse_score=original.sparse_score,
                 safety_tier=original.safety_tier,
+                source_file=original.source_file,
+                pack_id=original.pack_id,
             )
         )
     return results
