@@ -159,6 +159,22 @@ body::before {
   border-top: 1px solid var(--border);
   margin: 1.2em 0;
 }
+.md-link {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid var(--accent-dim);
+  transition: border-color 0.15s;
+}
+.md-link:hover {
+  border-color: var(--accent);
+}
+.markdown-body a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.markdown-body a:hover {
+  text-decoration: underline;
+}
 
 /* ─── Animations ─── */
 @keyframes fadeInUp {

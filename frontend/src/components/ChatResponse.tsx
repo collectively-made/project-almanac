@@ -1,5 +1,6 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Source {
   source: string;
@@ -223,7 +224,19 @@ export function ChatResponse({ message, isLatest }: ChatResponseProps) {
             </span>
           ) : (
             <div className="markdown-body">
-              <ReactMarkdown>{message.content}</ReactMarkdown>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  a: ({ href, children }) => (
+                    <a href={href} target="_blank" rel="noopener noreferrer" className="md-link">
+                      {children}
+                      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" style={{ display: "inline", marginLeft: 3, verticalAlign: "middle" }}>
+                        <path d="M5 11L11 5M11 5H6M11 5v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </a>
+                  ),
+                }}
+              >{message.content}</ReactMarkdown>
             </div>
           )}
         </div>
