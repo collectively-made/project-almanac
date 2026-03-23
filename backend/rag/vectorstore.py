@@ -55,6 +55,18 @@ class VectorStore:
                 source_file TEXT NOT NULL DEFAULT ''
             )
         """)
+        # Migration: add source_file column if it doesn't exist (upgrade from older schema)
+        try:
+            conn.execute("SELECT source_file FROM chunks LIMIT 1")
+        except Exception:
+            logger.info("Migrating: adding source_file column to chunks table")
+            conn.execute("ALTER TABLE chunks ADD COLUMN source_file TEXT NOT NULL DEFAULT ''")
+            # Force re-index by clearing the content_pack_index
+            try:
+                conn.execute("DELETE FROM content_pack_index")
+            except Exception:
+                pass
+            conn.commit()
         # Vector index — float32 for simplicity and compatibility
         conn.execute(f"""
             CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec
