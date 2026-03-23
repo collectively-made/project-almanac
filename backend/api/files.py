@@ -52,11 +52,13 @@ async def serve_file(pack_id: str, filename: str):
     }
     media_type = media_types.get(file_path.suffix.lower(), "application/octet-stream")
 
-    return FileResponse(
+    response = FileResponse(
         file_path,
         media_type=media_type,
-        filename=file_path.name,
     )
+    # Display inline in browser (not download)
+    response.headers["Content-Disposition"] = f'inline; filename="{file_path.name}"'
+    return response
 
 
 @router.get("/api/files")
