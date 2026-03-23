@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChatInput } from "./components/ChatInput";
 import { ChatResponse } from "./components/ChatResponse";
+import { Sidebar } from "./components/Sidebar";
 import { Setup } from "./pages/Setup";
 import { Settings } from "./pages/Settings";
 import { Profile } from "./pages/Profile";
@@ -18,10 +19,11 @@ const SUGGESTED = [
 
 export default function App() {
   const [page, setPage] = useState<Page>("loading");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const {
-    messages, isStreaming, chatMode, hasProfile,
-    sendMessage, startProfileChat, newChat, checkProfile,
+    messages, isStreaming, chatMode, hasProfile, activeThreadId,
+    sendMessage, startProfileChat, newChat, loadThread, checkProfile,
   } = useChat();
 
   // Check profile on page changes
@@ -63,11 +65,19 @@ export default function App() {
 
   return (
     <div className="app-layout">
+      <Sidebar
+        activeThreadId={activeThreadId}
+        onSelectThread={loadThread}
+        onNewChat={newChat}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
       <Header
         chatMode={chatMode}
         hasProfile={hasProfile}
         hasMessages={messages.length > 0}
         onNewChat={newChat}
+        onOpenSidebar={() => setSidebarOpen(true)}
         onProfile={() => { if (hasProfile) setPage("context-summary"); else startProfileChat(); }}
         onSettings={() => setPage("settings")}
       />
@@ -133,17 +143,23 @@ function LoadingScreen() {
   );
 }
 
-function Header({ chatMode, hasProfile, hasMessages, onNewChat, onProfile, onSettings }: {
+function Header({ chatMode, hasProfile, hasMessages, onNewChat, onOpenSidebar, onProfile, onSettings }: {
   chatMode: string;
   hasProfile: boolean;
   hasMessages: boolean;
   onNewChat: () => void;
+  onOpenSidebar: () => void;
   onProfile: () => void;
   onSettings: () => void;
 }) {
   return (
     <header className="app-header">
       <div className="header-left">
+        <button onClick={onOpenSidebar} className="header-btn sidebar-toggle" title="Conversations">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
         <div className="header-mark" />
         <div>
           <h1 className="header-title">ALMANAC</h1>

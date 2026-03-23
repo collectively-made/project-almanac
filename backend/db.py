@@ -68,6 +68,30 @@ class Database:
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
+        await self.execute("""
+            CREATE TABLE IF NOT EXISTS threads (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL DEFAULT 'New conversation',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await self.execute("""
+            CREATE TABLE IF NOT EXISTS thread_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                confidence REAL,
+                sources TEXT,
+                grounded INTEGER,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await self.execute("""
+            CREATE INDEX IF NOT EXISTS idx_thread_messages_thread
+            ON thread_messages(thread_id, created_at)
+        """)
 
     async def integrity_check(self) -> bool:
         rows = await self.execute("PRAGMA integrity_check")
