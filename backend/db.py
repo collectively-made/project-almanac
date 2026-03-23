@@ -20,7 +20,7 @@ class Database:
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA foreign_keys=ON")
-            # sqlite-vec extension loaded here when available
+            conn.execute("PRAGMA busy_timeout=5000")  # Retry for 5s on lock contention
             self._local.conn = conn
         return self._local.conn
 

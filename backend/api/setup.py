@@ -81,19 +81,53 @@ async def setup_status(
     }
 
 
+ALLOWED_DOWNLOAD_DOMAINS = {"huggingface.co", "hf-mirror.com"}
+MAX_MODEL_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB
+
+
 class DownloadModelRequest(BaseModel):
     url: str
     filename: str
 
 
+def _validate_download_request(url: str, filename: str) -> tuple[str, Path]:
+    """Validate download URL and filename. Returns (url, safe_dest_path)."""
+    from urllib.parse import urlparse
+
+    # Validate URL domain
+    parsed = urlparse(url)
+    if parsed.scheme != "https":
+        raise HTTPException(400, "Only HTTPS URLs are allowed")
+    if parsed.hostname not in ALLOWED_DOWNLOAD_DOMAINS:
+        raise HTTPException(
+            400,
+            f"Downloads only allowed from: {', '.join(ALLOWED_DOWNLOAD_DOMAINS)}"
+        )
+
+    # Sanitize filename — strip path components, enforce .gguf extension
+    safe_name = Path(filename).name
+    if not safe_name or not safe_name.endswith(".gguf"):
+        raise HTTPException(400, "Filename must end with .gguf")
+    if safe_name.startswith("."):
+        raise HTTPException(400, "Invalid filename")
+
+    dest = settings.models_dir / safe_name
+    # Verify resolved path is inside models_dir
+    if not dest.resolve().parent == settings.models_dir.resolve():
+        raise HTTPException(400, "Invalid filename")
+
+    return url, dest
+
+
 @router.post("/api/setup/download-model")
 async def download_model(body: DownloadModelRequest):
-    """Download a model from URL with SSE progress streaming."""
+    """Download a model from an approved source with SSE progress streaming."""
+    url, dest = _validate_download_request(body.url, body.filename)
 
     async def _download_stream():
+        import hashlib
         import urllib.request
 
-        dest = settings.models_dir / body.filename
         dest.parent.mkdir(parents=True, exist_ok=True)
 
         try:
@@ -101,7 +135,7 @@ async def download_model(body: DownloadModelRequest):
                 "event": "progress", "stage": "connecting", "percent": 0
             })}
 
-            req = urllib.request.Request(body.url)
+            req = urllib.request.Request(url)
             req.add_header("User-Agent", "ProjectAlmanac/0.1")
 
             loop = asyncio.get_running_loop()
@@ -109,7 +143,13 @@ async def download_model(body: DownloadModelRequest):
             def _do_download():
                 response = urllib.request.urlopen(req, timeout=30)
                 total = int(response.headers.get("Content-Length", 0))
+
+                # Reject excessively large files
+                if total > MAX_MODEL_SIZE:
+                    raise ValueError(f"File too large: {total} bytes (max {MAX_MODEL_SIZE})")
+
                 downloaded = 0
+                sha256 = hashlib.sha256()
                 chunk_size = 1024 * 1024  # 1MB chunks
 
                 with open(str(dest), "wb") as f:
@@ -118,26 +158,36 @@ async def download_model(body: DownloadModelRequest):
                         if not chunk:
                             break
                         f.write(chunk)
+                        sha256.update(chunk)
                         downloaded += len(chunk)
+                        if downloaded > MAX_MODEL_SIZE:
+                            raise ValueError("Download exceeded maximum size")
 
-                return total, downloaded
+                return total, downloaded, sha256.hexdigest()
 
-            total, downloaded = await loop.run_in_executor(None, _do_download)
+            total, downloaded, file_hash = await loop.run_in_executor(None, _do_download)
+
+            # Log the hash for future pinning
+            logger.info("Downloaded %s: %d bytes, SHA256=%s", dest.name, downloaded, file_hash)
 
             yield {"event": "progress", "data": json.dumps({
                 "event": "progress", "stage": "complete",
-                "percent": 100, "filename": body.filename,
+                "percent": 100, "filename": dest.name,
                 "size_mb": round(downloaded / (1024 * 1024), 1),
+                "sha256": file_hash,
             })}
 
             yield {"event": "done", "data": json.dumps({
-                "event": "done", "filename": body.filename,
+                "event": "done", "filename": dest.name,
             })}
 
         except Exception as e:
             logger.exception("Model download failed")
+            # Clean up partial download
+            if dest.exists():
+                dest.unlink(missing_ok=True)
             yield {"event": "error", "data": json.dumps({
-                "event": "error", "message": str(e),
+                "event": "error", "message": "Download failed. Please try again.",
             })}
 
     return EventSourceResponse(_download_stream(), media_type="text/event-stream")

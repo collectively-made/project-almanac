@@ -35,6 +35,7 @@ class VectorStore:
             sqlite_vec.load(conn)
             conn.enable_load_extension(False)
             conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=5000")
             self._local.conn = conn
         return self._local.conn
 

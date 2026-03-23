@@ -32,6 +32,9 @@ class AlmanacSettings(BaseSettings):
     # Safety
     max_message_length: int = 2048
 
+    # CORS — restrict to same-origin by default
+    cors_origins: str = ""  # Comma-separated origins, empty = same-origin only
+
     # Auto-setup: download and load a model on first boot
     auto_setup: bool = True
 

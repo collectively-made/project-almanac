@@ -115,9 +115,15 @@ class LLMManager:
 
     async def load_model(self, model_name: str) -> None:
         """Load a GGUF model. Blocks if the semaphore is held."""
-        model_path = self._models_dir / model_name
+        # Sanitize model name — prevent path traversal
+        safe_name = Path(model_name).name
+        if not safe_name or not safe_name.endswith(".gguf"):
+            raise FileNotFoundError(f"Invalid model name: {model_name}")
+        model_path = (self._models_dir / safe_name).resolve()
+        if not model_path.is_relative_to(self._models_dir.resolve()):
+            raise FileNotFoundError(f"Invalid model path: {model_name}")
         if not model_path.exists():
-            raise FileNotFoundError(f"Model not found: {model_path}")
+            raise FileNotFoundError(f"Model not found: {safe_name}")
 
         # Check RAM before loading
         file_size_gb = model_path.stat().st_size / (1024**3)
@@ -232,9 +238,10 @@ class LLMManager:
             raise RuntimeError("Model is busy processing another request")
 
         try:
-            queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
+            queue: asyncio.Queue[Optional[str]] = asyncio.Queue(maxsize=256)
             loop = asyncio.get_running_loop()
             llm = self._llm
+            cancelled = False
 
             def _blocking_chat():
                 try:
@@ -244,6 +251,8 @@ class LLMManager:
                         temperature=temperature,
                         stream=True,
                     ):
+                        if cancelled:
+                            break
                         delta = chunk["choices"][0].get("delta", {})
                         text = delta.get("content", "")
                         if text:
@@ -255,12 +264,23 @@ class LLMManager:
 
             loop.run_in_executor(self._executor, _blocking_chat)
 
+            # Hard timeout: 120 seconds max generation time
+            deadline = asyncio.get_event_loop().time() + 120
             while True:
-                token = await queue.get()
+                remaining = deadline - asyncio.get_event_loop().time()
+                if remaining <= 0:
+                    cancelled = True
+                    logger.warning("Generation timed out after 120s")
+                    break
+                try:
+                    token = await asyncio.wait_for(queue.get(), timeout=min(remaining, 5.0))
+                except asyncio.TimeoutError:
+                    continue  # Check deadline again
                 if token is None:
                     break
                 yield token
         finally:
+            cancelled = True
             sem.release()
 
     async def unload(self) -> None:

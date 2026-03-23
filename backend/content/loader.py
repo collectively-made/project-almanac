@@ -56,7 +56,7 @@ def _load_precomputed_embeddings(pack_dir: Path, chunk_ids: list[str]) -> Option
     # Look for a single embeddings.npy file
     npy_path = vec_dir / "embeddings.npy"
     if npy_path.exists():
-        embeddings = np.load(str(npy_path))
+        embeddings = np.load(str(npy_path), allow_pickle=False)
         if embeddings.shape[0] == len(chunk_ids):
             logger.info("Loaded pre-computed embeddings from %s", npy_path)
             return embeddings.astype(np.float32)

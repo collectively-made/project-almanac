@@ -39,9 +39,14 @@ Only include fields you actually learned about. Use null for fields not discusse
 IMPORTANT: Keep questions SHORT. One question per message. Be warm but efficient. The user wants to get to using the app, not fill out a form."""
 
 
+class HistoryMessage(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")  # Only user/assistant, never system
+    content: str = Field(..., max_length=4096)
+
+
 class ProfileChatRequest(BaseModel):
     message: str = Field(..., max_length=2048)
-    history: list[dict] = Field(default_factory=list)  # Previous messages
+    history: list[HistoryMessage] = Field(default_factory=list, max_length=20)
 
 
 def _sse_event(event: str, **kwargs) -> dict:
@@ -77,14 +82,15 @@ async def _stream_profile_chat(
     llm: LLMManager,
     db: Database,
     message: str,
-    history: list[dict],
+    history: list[HistoryMessage],
 ):
     """Run a profile-building conversation with the LLM."""
     full_response = ""
 
     try:
         messages = [{"role": "system", "content": PROFILE_SYSTEM_PROMPT}]
-        messages.extend(history)
+        # Only allow user/assistant roles — validated by Pydantic
+        messages.extend({"role": m.role, "content": m.content} for m in history)
         messages.append({"role": "user", "content": message})
 
         async for token in llm.chat(
@@ -100,17 +106,18 @@ async def _stream_profile_chat(
         # Check if the response contains a profile JSON
         profile_data = _extract_profile_json(full_response)
         if profile_data:
-            # Save the profile
+            # Validate through UserProfile schema before saving
             try:
-                from backend.api.context import _ensure_table
+                from backend.api.context import UserProfile, _ensure_table
+                validated = UserProfile(**profile_data).model_dump(exclude_none=True)
                 await _ensure_table(db)
                 await db.execute(
                     """INSERT OR REPLACE INTO user_profile (key, data, updated_at)
                     VALUES ('default', ?, datetime('now'))""",
-                    (json.dumps(profile_data),),
+                    (json.dumps(validated),),
                 )
-                logger.info("Profile saved from conversation: %d fields", len(profile_data))
-                yield _sse_event("profile_saved", fields=len(profile_data))
+                logger.info("Profile saved from conversation: %d fields", len(validated))
+                yield _sse_event("profile_saved", fields=len(validated))
             except Exception as e:
                 logger.exception("Failed to save profile from conversation")
 

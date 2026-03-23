@@ -66,7 +66,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "script-src 'self'; "
-            "style-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data:; "
             "connect-src 'self'"
         )
@@ -164,11 +165,17 @@ def create_app() -> FastAPI:
 
     # Middleware
     app.add_middleware(SecurityHeadersMiddleware)
+    # CORS — same-origin by default, configurable via ALMANAC_CORS_ORIGINS
+    origins = (
+        [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+        if settings.cors_origins
+        else []
+    )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Same-origin in production; permissive for dev
+        allow_origins=origins,
         allow_methods=["GET", "POST"],
-        allow_headers=["*"],
+        allow_headers=["Content-Type"],
     )
 
     # API routes

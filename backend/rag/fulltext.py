@@ -23,6 +23,7 @@ class FullTextSearch:
             self._db_path.parent.mkdir(parents=True, exist_ok=True)
             conn = sqlite3.connect(str(self._db_path))
             conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=5000")
             self._local.conn = conn
         return self._local.conn
 
@@ -67,8 +68,17 @@ class FullTextSearch:
         """BM25 search. Returns chunks ranked by relevance."""
         conn = self._get_conn()
 
-        # Sanitize query for FTS5 (escape special chars)
-        safe_query = query.replace('"', '""')
+        # Sanitize: tokenize and wrap each term in quotes with proper escaping
+        import re as _re
+        words = _re.findall(r'\w+', query)  # Extract only word characters
+        if not words:
+            return []
+        # Each term individually quoted and escaped for FTS5
+        safe_terms = " ".join(
+            '"' + w.replace('"', '""') + '"' for w in words if len(w) > 1
+        )
+        if not safe_terms:
+            return []
 
         try:
             rows = conn.execute(
@@ -84,14 +94,14 @@ class FullTextSearch:
                 ORDER BY rank
                 LIMIT ?
                 """,
-                (f'"{safe_query}"', top_k),
+                (safe_terms, top_k),
             ).fetchall()
         except Exception:
-            # If exact match fails, try individual terms
-            terms = " OR ".join(
-                f'"{t}"' for t in query.split() if len(t) > 2
+            # Fallback: try individual terms with OR
+            or_terms = " OR ".join(
+                '"' + w.replace('"', '""') + '"' for w in words if len(w) > 2
             )
-            if not terms:
+            if not or_terms:
                 return []
             try:
                 rows = conn.execute(
@@ -102,7 +112,7 @@ class FullTextSearch:
                     ORDER BY rank
                     LIMIT ?
                     """,
-                    (terms, top_k),
+                    (or_terms, top_k),
                 ).fetchall()
             except Exception:
                 return []

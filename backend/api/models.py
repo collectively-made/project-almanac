@@ -36,11 +36,11 @@ async def load_model(
         await llm.load_model(body.name)
         return {"status": "ok", "model": body.name}
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Model not found: {body.name}")
-    except MemoryError as e:
-        raise HTTPException(status_code=507, detail=str(e))
-    except ImportError as e:
-        raise HTTPException(status_code=501, detail=str(e))
-    except Exception as e:
+        raise HTTPException(status_code=404, detail="Model not found")
+    except MemoryError:
+        raise HTTPException(status_code=507, detail="Insufficient memory. Try a smaller model.")
+    except ImportError:
+        raise HTTPException(status_code=501, detail="LLM runtime not installed")
+    except Exception:
         logger.exception("Failed to load model")
-        raise HTTPException(status_code=500, detail=f"Failed to load model: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load model")
