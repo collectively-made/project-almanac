@@ -16,6 +16,7 @@ from backend.api.health import router as health_router
 from backend.api.models import router as models_router
 from backend.api.profile_chat import router as profile_chat_router
 from backend.api.files import router as files_router
+from backend.api.provider import router as provider_router
 from backend.api.setup import router as setup_router
 from backend.api.threads import router as threads_router
 from backend.config import settings
@@ -188,6 +189,7 @@ def create_app() -> FastAPI:
     app.include_router(context_router)
     app.include_router(files_router)
     app.include_router(profile_chat_router)
+    app.include_router(provider_router)
     app.include_router(threads_router)
 
     # SPA static files (must be last — catches all non-API routes)

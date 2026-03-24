@@ -10,7 +10,8 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from backend.config import settings
-from backend.dependencies import get_llm_manager, get_vectorstore
+from backend.db import Database
+from backend.dependencies import get_database, get_llm_manager, get_vectorstore
 from backend.llm.manager import LLMManager, _get_available_ram_gb
 from backend.rag.vectorstore import VectorStore
 
@@ -24,6 +25,7 @@ router = APIRouter()
 async def setup_status(
     llm: LLMManager = Depends(get_llm_manager),
     vectorstore: VectorStore = Depends(get_vectorstore),
+    db: Database = Depends(get_database),
 ):
     """Check if the system needs initial setup."""
     models = llm.list_models()
@@ -32,7 +34,14 @@ async def setup_status(
     chunks = vectorstore.count_chunks()
     ram_gb = _get_available_ram_gb()
 
-    if not has_model:
+    # Check if cloud provider is configured
+    from backend.api.provider import get_active_provider
+    provider_config = await get_active_provider(db)
+    has_cloud = provider_config.get("provider") in ("anthropic", "openai") and provider_config.get("api_key")
+
+    if has_cloud:
+        status = "ready"  # Cloud API configured — no local model needed
+    elif not has_model:
         status = "needs_model"
     elif not model_loaded:
         status = "model_available"

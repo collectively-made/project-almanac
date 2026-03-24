@@ -37,6 +37,9 @@ export function Setup({ onReady }: SetupProps) {
   const [error, setError] = useState("");
   const [downloadProgress, setDownloadProgress] = useState("");
   const [loadingModel, setLoadingModel] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [apiProvider, setApiProvider] = useState<"anthropic" | "openai">("anthropic");
+  const [savingApi, setSavingApi] = useState(false);
 
   const fetchStatus = async () => {
     try {
@@ -108,6 +111,29 @@ export function Setup({ onReady }: SetupProps) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Download failed. Try the manual link.");
       setStep("needs-model");
+    }
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!apiKey.trim()) return;
+    setSavingApi(true);
+    setError("");
+    try {
+      const r = await fetch("/api/provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: apiProvider, api_key: apiKey.trim() }),
+      });
+      if (r.ok) {
+        onReady();
+      } else {
+        const d = await r.json();
+        setError(d.detail || "Failed to save API key");
+      }
+    } catch {
+      setError("Failed to save API key");
+    } finally {
+      setSavingApi(false);
     }
   };
 
@@ -214,6 +240,54 @@ export function Setup({ onReady }: SetupProps) {
               {status.hardware.ram_gb} GB RAM · {status.hardware.cpu_count} CPUs
               {status.hardware.gpu ? ` · ${status.hardware.gpu}` : ""}
               {" · "}{status.indexed_chunks} knowledge chunks
+            </div>
+
+            {/* Cloud API option */}
+            <div className="su-section">
+              <div className="su-label">OPTION 1: USE CLOUD AI (FASTEST)</div>
+              <p className="su-muted" style={{ marginBottom: 10, fontSize: 12 }}>
+                Connect to Anthropic (Claude) or OpenAI (GPT) for instant, high-quality responses. No model download needed.
+              </p>
+              <div className="su-cloud-form">
+                <div className="su-cloud-toggle">
+                  <button
+                    className={`su-cloud-opt ${apiProvider === "anthropic" ? "active" : ""}`}
+                    onClick={() => setApiProvider("anthropic")}
+                  >Anthropic (Claude)</button>
+                  <button
+                    className={`su-cloud-opt ${apiProvider === "openai" ? "active" : ""}`}
+                    onClick={() => setApiProvider("openai")}
+                  >OpenAI (GPT)</button>
+                </div>
+                <input
+                  type="password"
+                  className="su-cloud-input"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={apiProvider === "anthropic" ? "sk-ant-..." : "sk-..."}
+                />
+                <button
+                  className="su-btn"
+                  onClick={handleSaveApiKey}
+                  disabled={!apiKey.trim() || savingApi}
+                  style={{ width: "100%" }}
+                >
+                  {savingApi ? "Connecting..." : "Connect & Start"}
+                </button>
+              </div>
+              <div className="su-privacy-note">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+                </svg>
+                <span>
+                  Your questions and context will be sent to {apiProvider === "anthropic" ? "Anthropic" : "OpenAI"} servers for processing.
+                  Your knowledge base stays local. You can switch to a local model anytime.
+                </span>
+              </div>
+            </div>
+
+            <div className="su-divider">
+              <span>or run locally</span>
             </div>
 
             {/* Low RAM warning */}
@@ -356,6 +430,18 @@ export function Setup({ onReady }: SetupProps) {
         .su-load-bar { width:100%; height:4px; background:var(--border); border-radius:2px; overflow:hidden; margin-bottom:16px; }
         .su-load-bar-fill { height:100%; width:30%; background:var(--accent); border-radius:2px; animation:loadSlide 2s ease-in-out infinite; }
         @keyframes loadSlide { 0% { width:10%; margin-left:0; } 50% { width:40%; margin-left:30%; } 100% { width:10%; margin-left:90%; } }
+
+        .su-cloud-form { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+        .su-cloud-toggle { display:flex; gap:4px; }
+        .su-cloud-opt { flex:1; padding:8px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text-muted); font-size:12px; cursor:pointer; transition:all 0.15s; font-family:var(--font-body); text-align:center; }
+        .su-cloud-opt.active { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+        .su-cloud-input { width:100%; padding:9px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; color:var(--text-bright); font-family:var(--font-mono); font-size:13px; outline:none; }
+        .su-cloud-input:focus { border-color:var(--accent); }
+        .su-cloud-input::placeholder { color:var(--text-dim); }
+        .su-privacy-note { display:flex; align-items:flex-start; gap:8px; font-size:11px; color:var(--text-dim); line-height:1.5; margin-top:4px; }
+        .su-privacy-note svg { flex-shrink:0; margin-top:1px; color:var(--accent); }
+        .su-divider { display:flex; align-items:center; gap:12px; margin:20px 0; color:var(--text-dim); font-family:var(--font-mono); font-size:10px; letter-spacing:0.08em; }
+        .su-divider::before, .su-divider::after { content:''; flex:1; height:1px; background:var(--border); }
 
         .su-warning { display:flex; gap:10px; padding:12px 14px; background:var(--accent-dim); border:1px solid var(--accent); border-radius:8px; margin-bottom:16px; font-size:13px; color:var(--text); line-height:1.5; }
         .su-warning strong { display:block; margin-bottom:4px; }

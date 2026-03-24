@@ -125,6 +125,23 @@ async def _load_user_context(db: Database) -> str:
     return ""
 
 
+async def _get_cloud_llm(db: Database):
+    """Get a cloud LLM client if configured, else None."""
+    try:
+        from backend.api.provider import get_active_provider
+        from backend.llm.cloud import CloudLLM
+        config = await get_active_provider(db)
+        if config.get("provider") in ("anthropic", "openai") and config.get("api_key"):
+            return CloudLLM(
+                provider=config["provider"],
+                api_key=config["api_key"],
+                model=config.get("model"),
+            )
+    except Exception:
+        pass
+    return None
+
+
 async def _stream_response(
     request: Request,
     llm: LLMManager,
@@ -150,12 +167,14 @@ async def _stream_response(
         # Step 3: Build chat messages with context + conversation history
         messages = _build_messages(message, chunks, grounded, user_context, history)
 
-        # Step 3: Stream LLM response via chat completion
-        async for token in llm.chat(
-            messages=messages,
-            max_tokens=2048,
-            temperature=0.3,
-        ):
+        # Step 4: Stream LLM response — cloud API or local
+        cloud = await _get_cloud_llm(db)
+        if cloud:
+            gen = cloud.chat(messages=messages, max_tokens=2048, temperature=0.3)
+        else:
+            gen = llm.chat(messages=messages, max_tokens=2048, temperature=0.3)
+
+        async for token in gen:
             if await request.is_disconnected():
                 logger.info("Client disconnected during streaming")
                 return
@@ -210,22 +229,25 @@ async def chat(
     retriever: Retriever = Depends(get_retriever),
     db: Database = Depends(get_database),
 ):
-    if not llm.is_loaded:
-        return EventSourceResponse(
-            iter(
-                [
-                    _sse_event(
-                        "error",
-                        message="No model loaded. Please load a model first.",
-                        recoverable=True,
-                    )
-                ]
-            ),
-            media_type="text/event-stream",
-            status_code=503,
-        )
+    # Check if cloud provider is active — skip local model checks
+    cloud = await _get_cloud_llm(db)
+    if not cloud:
+        if not llm.is_loaded:
+            return EventSourceResponse(
+                iter(
+                    [
+                        _sse_event(
+                            "error",
+                            message="No model loaded. Please load a model or add a cloud API key.",
+                            recoverable=True,
+                        )
+                    ]
+                ),
+                media_type="text/event-stream",
+                status_code=503,
+            )
 
-    if llm.is_busy:
+    if not cloud and llm.is_busy:
         return EventSourceResponse(
             iter(
                 [
