@@ -32,6 +32,9 @@ export function Settings({ onBack, onProfile }: SettingsProps) {
   const [apiProvider, setApiProvider] = useState<"anthropic" | "openai">("anthropic");
   const [saving, setSaving] = useState(false);
   const [unloading, setUnloading] = useState(false);
+  const [loadingModel, setLoadingModel] = useState("");
+  const [showRecommended, setShowRecommended] = useState(false);
+  const [recommended, setRecommended] = useState<{ name: string; parameters: string; min_ram_gb: number; estimated_tps: number; fit_level: string; gguf_url: string; download_url: string; download_filename: string; provider: string; quantization: string }[]>([]);
   const [message, setMessage] = useState("");
 
   const refresh = () => {
@@ -41,6 +44,85 @@ export function Settings({ onBack, onProfile }: SettingsProps) {
   };
 
   useEffect(() => { refresh(); }, []);
+
+  const handleLoadModel = async (name: string) => {
+    setLoadingModel(name);
+    setMessage("");
+    try {
+      const r = await fetch("/api/models/load", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (r.ok) {
+        setMessage(`Loaded ${name}`);
+        setLoadingModel("");
+        refresh();
+      } else {
+        const d = await r.json();
+        setMessage(d.detail || "Failed to load");
+        setLoadingModel("");
+      }
+    } catch {
+      setMessage("Failed to load model");
+      setLoadingModel("");
+    }
+  };
+
+  const handleShowRecommended = async () => {
+    setShowRecommended(true);
+    try {
+      const r = await fetch("/api/setup/status");
+      const data = await r.json();
+      setRecommended(data.recommended_models || []);
+    } catch { /* silent */ }
+  };
+
+  const handleInstallModel = async (model: typeof recommended[0]) => {
+    if (!model.download_url || !model.download_filename) {
+      window.open(model.gguf_url, "_blank");
+      return;
+    }
+    setLoadingModel(model.download_filename);
+    setMessage("Downloading...");
+    try {
+      const r = await fetch("/api/setup/download-model", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: model.download_url, filename: model.download_filename }),
+      });
+      if (!r.ok || !r.body) throw new Error("Download failed");
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.event === "done") {
+              setMessage("Downloaded! Loading...");
+              await handleLoadModel(model.download_filename);
+              setShowRecommended(false);
+              return;
+            } else if (data.event === "error") {
+              setMessage(data.message || "Download failed");
+              setLoadingModel("");
+              return;
+            }
+          } catch {}
+        }
+      }
+    } catch {
+      setMessage("Download failed. Try the manual link.");
+      setLoadingModel("");
+    }
+  };
 
   const handleUnload = async () => {
     setUnloading(true);
@@ -161,15 +243,63 @@ export function Settings({ onBack, onProfile }: SettingsProps) {
           ) : (
             <p className="st-note">No local model loaded</p>
           )}
-          {models?.models && models.models.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <p className="st-note">Available in volume:</p>
+
+          {/* Models in volume — with load buttons */}
+          {models?.models && models.models.length > 0 && !health?.model_loaded && (
+            <div style={{ marginTop: 10 }}>
+              <p className="st-note" style={{ marginBottom: 8 }}>Available in volume:</p>
               {models.models.map((m) => (
-                <div key={m.name} className="st-row">
-                  <span className="st-key mono">{m.name}</span>
-                  <span className="st-val dim">{Math.round(m.size_mb)} MB</span>
+                <div key={m.name} className="st-model-row">
+                  <div>
+                    <span className="st-model-name">{m.name}</span>
+                    <span className="st-model-badge">{Math.round(m.size_mb)} MB</span>
+                  </div>
+                  <button
+                    className="st-btn-sm"
+                    onClick={() => handleLoadModel(m.name)}
+                    disabled={!!loadingModel}
+                  >
+                    {loadingModel === m.name ? "Loading..." : "Load"}
+                  </button>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* No model at all — show browse recommended */}
+          {(!models?.models || models.models.length === 0) && !health?.model_loaded && (
+            <div style={{ marginTop: 10 }}>
+              {!showRecommended ? (
+                <button className="st-btn-outline" onClick={handleShowRecommended}>
+                  Browse recommended models
+                </button>
+              ) : (
+                <div>
+                  <p className="st-note" style={{ marginBottom: 8 }}>Recommended for your hardware:</p>
+                  {recommended.length === 0 && <p className="st-note">Loading recommendations...</p>}
+                  {recommended.map((m) => (
+                    <div key={m.name} className="st-model-row">
+                      <div style={{ minWidth: 0 }}>
+                        <span className="st-model-name">{m.name.split("/").pop()}</span>
+                        <span className="st-model-badge">{m.parameters}</span>
+                        <p className="st-model-meta">{m.provider} · {m.min_ram_gb} GB · ~{Math.round(m.estimated_tps)} tok/s</p>
+                      </div>
+                      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                        <button
+                          className="st-btn-sm"
+                          onClick={() => handleInstallModel(m)}
+                          disabled={!!loadingModel}
+                        >
+                          {loadingModel === m.download_filename ? "..." : "Install"}
+                        </button>
+                        {m.gguf_url && (
+                          <a href={m.gguf_url} target="_blank" rel="noopener" className="st-btn-sm-link">↗</a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -247,6 +377,16 @@ export function Settings({ onBack, onProfile }: SettingsProps) {
         .st-input { width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; color:var(--text-bright); font-family:var(--font-mono); font-size:13px; outline:none; }
         .st-input:focus { border-color:var(--accent); }
         .st-input::placeholder { color:var(--text-dim); }
+
+        .st-model-row { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:var(--bg); border:1px solid var(--border); border-radius:6px; margin-bottom:6px; gap:10px; }
+        .st-model-name { font-family:var(--font-mono); font-size:12px; color:var(--text); font-weight:500; }
+        .st-model-badge { font-family:var(--font-mono); font-size:10px; color:var(--accent); margin-left:6px; padding:1px 5px; border:1px solid var(--accent-dim); border-radius:3px; }
+        .st-model-meta { font-size:11px; color:var(--text-dim); margin-top:2px; }
+        .st-btn-sm { padding:5px 12px; background:var(--accent); color:var(--bg); border:none; border-radius:4px; font-family:var(--font-mono); font-size:11px; font-weight:500; cursor:pointer; transition:filter 0.15s; }
+        .st-btn-sm:hover { filter:brightness(1.1); }
+        .st-btn-sm:disabled { opacity:0.5; cursor:wait; }
+        .st-btn-sm-link { padding:5px 8px; background:none; color:var(--accent); border:1px solid var(--accent); border-radius:4px; font-size:11px; text-decoration:none; transition:all 0.15s; }
+        .st-btn-sm-link:hover { background:var(--accent); color:var(--bg); }
       `}</style>
     </div>
   );
