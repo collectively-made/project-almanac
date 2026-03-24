@@ -221,11 +221,13 @@ export function Settings({ onBack, onProfile }: SettingsProps) {
           )}
         </section>
 
-        {/* Local Model */}
+        {/* Local Models */}
         <section className="st-section">
-          <div className="st-label">LOCAL MODEL</div>
-          {health?.model_loaded ? (
-            <>
+          <div className="st-label">LOCAL MODELS</div>
+
+          {/* Active model */}
+          {health?.model_loaded && (
+            <div className="st-active-model">
               <div className="st-row">
                 <span className="st-key">Active</span>
                 <span className="st-val active">{health.model_name}</span>
@@ -237,71 +239,77 @@ export function Settings({ onBack, onProfile }: SettingsProps) {
                 </div>
               )}
               <button className="st-btn-outline danger" onClick={handleUnload} disabled={unloading}>
-                {unloading ? "Unloading..." : "Unload model (free RAM)"}
+                {unloading ? "Unloading..." : "Unload (free RAM)"}
               </button>
-            </>
-          ) : (
-            <p className="st-note">No local model loaded</p>
-          )}
-
-          {/* Models in volume — with load buttons */}
-          {models?.models && models.models.length > 0 && !health?.model_loaded && (
-            <div style={{ marginTop: 10 }}>
-              <p className="st-note" style={{ marginBottom: 8 }}>Available in volume:</p>
-              {models.models.map((m) => (
-                <div key={m.name} className="st-model-row">
-                  <div>
-                    <span className="st-model-name">{m.name}</span>
-                    <span className="st-model-badge">{Math.round(m.size_mb)} MB</span>
-                  </div>
-                  <button
-                    className="st-btn-sm"
-                    onClick={() => handleLoadModel(m.name)}
-                    disabled={!!loadingModel}
-                  >
-                    {loadingModel === m.name ? "Loading..." : "Load"}
-                  </button>
-                </div>
-              ))}
             </div>
           )}
 
-          {/* No model at all — show browse recommended */}
-          {(!models?.models || models.models.length === 0) && !health?.model_loaded && (
-            <div style={{ marginTop: 10 }}>
-              {!showRecommended ? (
-                <button className="st-btn-outline" onClick={handleShowRecommended}>
-                  Browse recommended models
-                </button>
-              ) : (
-                <div>
-                  <p className="st-note" style={{ marginBottom: 8 }}>Recommended for your hardware:</p>
-                  {recommended.length === 0 && <p className="st-note">Loading recommendations...</p>}
-                  {recommended.map((m) => (
-                    <div key={m.name} className="st-model-row">
-                      <div style={{ minWidth: 0 }}>
-                        <span className="st-model-name">{m.name.split("/").pop()}</span>
-                        <span className="st-model-badge">{m.parameters}</span>
-                        <p className="st-model-meta">{m.provider} · {m.min_ram_gb} GB · ~{Math.round(m.estimated_tps)} tok/s</p>
-                      </div>
-                      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                        <button
-                          className="st-btn-sm"
-                          onClick={() => handleInstallModel(m)}
-                          disabled={!!loadingModel}
-                        >
-                          {loadingModel === m.download_filename ? "..." : "Install"}
-                        </button>
-                        {m.gguf_url && (
-                          <a href={m.gguf_url} target="_blank" rel="noopener" className="st-btn-sm-link">↗</a>
-                        )}
-                      </div>
+          {/* All models in volume — with load/active indicator */}
+          {models?.models && models.models.length > 0 && (
+            <div style={{ marginTop: health?.model_loaded ? 12 : 0 }}>
+              {models.models.length > 1 || !health?.model_loaded ? (
+                <p className="st-note" style={{ marginBottom: 8 }}>
+                  {health?.model_loaded ? "Switch to a different model:" : "Available models:"}
+                </p>
+              ) : null}
+              {models.models
+                .filter((m) => m.name !== health?.model_name)
+                .map((m) => (
+                  <div key={m.name} className="st-model-row">
+                    <div>
+                      <span className="st-model-name">{m.name}</span>
+                      <span className="st-model-badge">{Math.round(m.size_mb)} MB</span>
                     </div>
-                  ))}
-                </div>
-              )}
+                    <button
+                      className="st-btn-sm"
+                      onClick={() => handleLoadModel(m.name)}
+                      disabled={!!loadingModel}
+                    >
+                      {loadingModel === m.name ? "Loading..." : "Load"}
+                    </button>
+                  </div>
+                ))}
             </div>
           )}
+
+          {!health?.model_loaded && (!models?.models || models.models.length === 0) && (
+            <p className="st-note">No models installed</p>
+          )}
+
+          {/* Get more models — always available */}
+          <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+            {!showRecommended ? (
+              <button className="st-btn-outline" onClick={handleShowRecommended}>
+                Get more models
+              </button>
+            ) : (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <p className="st-note">Recommended for your hardware:</p>
+                  <button className="st-btn-text" onClick={() => setShowRecommended(false)}>Hide</button>
+                </div>
+                {recommended.length === 0 && <p className="st-note">Loading...</p>}
+                {recommended.map((m) => (
+                  <div key={m.name} className="st-model-row">
+                    <div style={{ minWidth: 0 }}>
+                      <span className="st-model-name">{m.name.split("/").pop()}</span>
+                      <span className="st-model-badge">{m.parameters}</span>
+                      <span className="st-model-badge" style={{ borderColor: "var(--sage-dim)", color: "var(--sage-bright)" }}>{m.fit_level}</span>
+                      <p className="st-model-meta">{m.provider} · {m.min_ram_gb} GB · ~{Math.round(m.estimated_tps)} tok/s</p>
+                    </div>
+                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                      <button className="st-btn-sm" onClick={() => handleInstallModel(m)} disabled={!!loadingModel}>
+                        {loadingModel === m.download_filename ? "..." : "Install"}
+                      </button>
+                      {m.gguf_url && (
+                        <a href={m.gguf_url} target="_blank" rel="noopener" className="st-btn-sm-link">↗</a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Profile */}
@@ -387,6 +395,9 @@ export function Settings({ onBack, onProfile }: SettingsProps) {
         .st-btn-sm:disabled { opacity:0.5; cursor:wait; }
         .st-btn-sm-link { padding:5px 8px; background:none; color:var(--accent); border:1px solid var(--accent); border-radius:4px; font-size:11px; text-decoration:none; transition:all 0.15s; }
         .st-btn-sm-link:hover { background:var(--accent); color:var(--bg); }
+        .st-btn-text { background:none; border:none; color:var(--text-dim); font-family:var(--font-mono); font-size:11px; cursor:pointer; padding:2px 4px; }
+        .st-btn-text:hover { color:var(--text-muted); }
+        .st-active-model { padding-bottom:8px; }
       `}</style>
     </div>
   );
