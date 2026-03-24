@@ -216,6 +216,19 @@ export function Setup({ onReady }: SetupProps) {
               {" · "}{status.indexed_chunks} knowledge chunks
             </div>
 
+            {/* Low RAM warning */}
+            {status.recommended_models.length === 0 && status.hardware.ram_gb < 6 && (
+              <div className="su-warning">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/>
+                </svg>
+                <div>
+                  <strong>Limited RAM detected ({status.hardware.ram_gb} GB)</strong>
+                  <p>Local AI models need at least 4 GB of free RAM. You can still install a small model below, but responses may be slow. For the best experience on this hardware, a cloud API option is coming soon.</p>
+                </div>
+              </div>
+            )}
+
             {/* Option 1: Recommended models from llmfit database */}
             {status.recommended_models.length > 0 && (
               <div className="su-section">
@@ -343,6 +356,11 @@ export function Setup({ onReady }: SetupProps) {
         .su-load-bar { width:100%; height:4px; background:var(--border); border-radius:2px; overflow:hidden; margin-bottom:16px; }
         .su-load-bar-fill { height:100%; width:30%; background:var(--accent); border-radius:2px; animation:loadSlide 2s ease-in-out infinite; }
         @keyframes loadSlide { 0% { width:10%; margin-left:0; } 50% { width:40%; margin-left:30%; } 100% { width:10%; margin-left:90%; } }
+
+        .su-warning { display:flex; gap:10px; padding:12px 14px; background:var(--accent-dim); border:1px solid var(--accent); border-radius:8px; margin-bottom:16px; font-size:13px; color:var(--text); line-height:1.5; }
+        .su-warning strong { display:block; margin-bottom:4px; }
+        .su-warning p { color:var(--text-muted); font-size:12px; margin:0; }
+        .su-warning svg { flex-shrink:0; color:var(--accent); margin-top:2px; }
 
         .su-error { font-size:12px; color:var(--danger); margin-top:8px; text-align:center; }
       `}</style>

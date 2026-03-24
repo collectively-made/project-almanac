@@ -42,8 +42,16 @@ async def setup_status(
     import os
     import platform
 
-    # Get hardware-aware recommendations from llmfit model database
-    total_ram = ram_gb
+    # Get total system RAM (not just available)
+    total_ram = ram_gb  # Fallback to available
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    total_ram = int(line.split()[1]) / (1024 * 1024)
+                    break
+    except FileNotFoundError:
+        pass  # macOS — _get_available_ram_gb already returns total
     # Detect GPU/unified memory
     is_apple_silicon = platform.processor() == "arm" or "apple" in platform.platform().lower()
     has_gpu = is_apple_silicon  # Simplified — Apple Silicon has Metal
@@ -64,7 +72,8 @@ async def setup_status(
         "available_models": models,
         "indexed_chunks": chunks,
         "hardware": {
-            "ram_gb": round(ram_gb, 1),
+            "ram_gb": round(total_ram, 1),
+            "available_ram_gb": round(ram_gb, 1),
             "cpu_count": os.cpu_count(),
             "gpu": "Apple Silicon (Metal)" if is_apple_silicon else "CPU only",
             "unified_memory": unified,

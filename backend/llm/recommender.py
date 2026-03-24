@@ -56,8 +56,9 @@ def recommend_models(
 
     # For unified memory (Apple Silicon), total RAM is usable for models
     usable_memory = available_ram_gb if not unified_memory else max(available_ram_gb, gpu_vram_gb)
-    # Reserve some RAM for the OS + app (~2.5GB)
-    model_budget = usable_memory - 2.5
+    # Reserve RAM for the OS + app (1.5GB in Docker, 2.5GB on bare metal)
+    overhead = 1.5 if not has_gpu else 2.5
+    model_budget = usable_memory - overhead
 
     scored = []
     for m in models:
