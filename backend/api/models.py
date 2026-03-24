@@ -44,3 +44,15 @@ async def load_model(
     except Exception:
         logger.exception("Failed to load model")
         raise HTTPException(status_code=500, detail="Failed to load model")
+
+
+@router.post("/api/models/unload")
+async def unload_model(llm: LLMManager = Depends(get_llm_manager)):
+    """Unload the current model to free RAM."""
+    if not llm.is_loaded:
+        return {"status": "ok", "message": "No model loaded"}
+    name = llm.model_name
+    llm._llm = None
+    llm._model_name = None
+    logger.info("Model unloaded: %s", name)
+    return {"status": "ok", "unloaded": name}
